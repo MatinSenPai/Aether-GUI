@@ -28,4 +28,14 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // The three/ backdrop is a cohesive module: mood.tsx co-locates the
+    // shared `mood` singleton and theme helpers with the MoodDriver component
+    // that owns them. Splitting purely to satisfy fast-refresh would scatter
+    // one concept across several files for no real benefit — exempt the dir.
+    files: ['src/components/three/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

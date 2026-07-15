@@ -1,8 +1,19 @@
 # Aether-GUI
 
+[![Release](https://img.shields.io/github/v/release/MatinSenPai/Aether-GUI?sort=semver)](https://github.com/MatinSenPai/Aether-GUI/releases)
+[![License: AGPL v3](https://img.shields.io/github/license/MatinSenPai/Aether-GUI)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![Rust](https://img.shields.io/badge/Rust-stable-000000?logo=rust&logoColor=white)
+
 A one-click desktop GUI for [**Aether**](https://github.com/CluvexStudio/Aether), a censorship-circumvention tunnel built for heavily restricted networks. Aether itself is a terminal tool: it discovers a working route out, establishes an encrypted tunnel, and exposes a local SOCKS5 proxy. Aether-GUI wraps that terminal tool in a small, animated desktop app so you don't have to touch a command line to use it — press Connect, and everything else (identity provisioning, route discovery, prompt answering) happens automatically in the background.
 
 This project does not reimplement any of Aether's tunneling logic. It drives the real `aether` binary in a pseudo-terminal, answers its interactive setup prompts on your behalf, and watches its output to tell you what's happening. All the actual censorship-circumvention work — MASQUE/QUIC obfuscation, WireGuard, route probing — is [Aether's](https://github.com/CluvexStudio/Aether), not this repo's.
+
+<p align="center">
+  <img src="docs/screenshot-idle.png" alt="Aether-GUI — one-click connect screen with an animated 3D backdrop" width="380">
+</p>
 
 ## Features
 
@@ -15,7 +26,7 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
   Each option has an explanation on hover.
 - **Live progress** — while Aether searches for a working route, the GUI shows real elapsed time and, once Aether reports its own scan budget, an actual percentage and progress bar — not just a spinner.
 - **Automatic reconnect** — if the tunnel drops unexpectedly mid-session (observed occasionally with WARP-in-WARP, but handled the same way for every protocol), the GUI retries automatically with backoff, shown as a visible "Reconnecting… (attempt N of 3)" rather than silently dying or dumping you back to a bare error. A user-requested disconnect is never retried.
-- Animated black-orange interface: an ambient background, a connect button whose ring/glow reflects live state, and smooth transitions throughout — all built on already-installed dependencies, no heavyweight rendering libraries.
+- Animated black-orange interface: a real-time WebGL backdrop (a flowing aurora gradient, a drifting 3D particle field, and an energy ring behind the connect button that all react to the connection state — orange while searching, teal once connected), plus a connect button whose ring/glow reflects live state and smooth transitions throughout. The WebGL scene degrades gracefully: it falls back to a lightweight CSS-only animated background when a GPU context isn't available (e.g. some Linux/webkit2gtk setups) or when the OS requests reduced motion.
 
 ## Installing
 
@@ -65,7 +76,7 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 
 ## How it works
 
-- **Frontend**: React 19 + Tailwind v4, state managed with Zustand, animated with [Motion](https://motion.dev/) — all talking to the Rust backend over Tauri's IPC.
+- **Frontend**: React 19 + Tailwind v4, state managed with Zustand, animated with [Motion](https://motion.dev/) for the UI and [React Three Fiber](https://r3f.docs.pmnd.rs/) (three.js) for the WebGL backdrop — all talking to the Rust backend over Tauri's IPC. The 3D scene reads the connection state directly from the store each frame (no per-frame React re-renders) and is code-split so it never blocks first paint.
 - **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real `aether` binary in a genuine pseudo-terminal (required because Aether's interactive prompts behave differently, or don't appear at all, over a plain pipe). A background thread reads Aether's output line by line, recognizes its three setup prompts by their header text, and answers them according to your chosen profile — while every line is also forwarded live to the GUI's log panel.
 - **Ground truth for "connected"**: the GUI doesn't trust Aether's log wording alone (that's fragile across releases) — it treats a successful TCP connection to the local SOCKS5 port (`127.0.0.1:1819`) as the actual proof the tunnel is up.
 - **State machine**: `Idle → Launching → Connecting → Connected`, with `Reconnecting` and `Error` as the two ways a connection attempt can end up needing your attention — `Reconnecting` retries automatically (with backoff, capped at 3 attempts), `Error` is the final word once retries are exhausted or something isn't retriable (e.g. the binary itself is missing).

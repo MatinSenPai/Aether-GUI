@@ -1,0 +1,71 @@
+name: Bug report
+description: Report something that isn't working in Aether-GUI
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. **Aether-GUI is a censorship-circumvention tool — do not paste
+        anything that could identify you or your location** (real IP addresses, server hostnames,
+        your city, etc.). Redact logs before posting.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: This is about the GUI. (Problems with the tunnel/protocols themselves belong upstream at CluvexStudio/Aether.)
+          required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the app
+        2. Click Connect
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: state
+    attributes:
+      label: Connection state when it happened
+      options:
+        - Idle (disconnected)
+        - Launching / Connecting (searching for a route)
+        - Connected
+        - Reconnecting
+        - Error
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: "e.g. Windows 11 23H2"
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Aether-GUI version
+      placeholder: "e.g. v0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: "From the app's Advanced panel. REDACT any IPs, hostnames, or identifying details first."
+      render: text
+    validations:
+      required: false

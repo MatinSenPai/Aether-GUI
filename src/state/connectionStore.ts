@@ -75,6 +75,14 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   retryAfterSidecarError: () => set({ sidecarError: null }),
 }));
 
+// Dev-only: lets the 3D backdrop's per-state moods be driven from the WebView2
+// devtools console without a live tunnel, e.g.
+//   __conn.setState({ status: { state: "Connecting" } })
+// Tree-shaken out of production builds by the import.meta.env.DEV guard.
+if (import.meta.env.DEV) {
+  (window as unknown as { __conn?: typeof useConnectionStore }).__conn = useConnectionStore;
+}
+
 const BUDGET_RE = /budget=(\d+)s/;
 
 /** Call once from App's top-level effect; returns a cleanup function. */

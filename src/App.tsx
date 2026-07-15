@@ -3,7 +3,7 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConnectionStatusLine } from "@/components/ConnectionStatusLine";
 import { AdvancedPanel } from "@/components/AdvancedPanel";
-import { AmbientBackground } from "@/components/AmbientBackground";
+import { Backdrop } from "@/components/three/Backdrop";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { initConnectionListeners, useConnectionStore } from "@/state/connectionStore";
@@ -43,7 +43,7 @@ export function App() {
     <TooltipProvider>
       <MotionConfig reducedMotion="user">
         <div className="relative h-svh w-full overflow-hidden bg-background">
-          <AmbientBackground />
+          <Backdrop />
           <AnimatePresence mode="wait">
             {sidecarError ? (
               <motion.div key="error" className="relative z-10" {...SCREEN_TRANSITION}>

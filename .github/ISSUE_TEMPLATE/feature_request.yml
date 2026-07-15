@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement to Aether-GUI
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Note: this is the **GUI** repo. Requests about the tunneling engine, protocols, or route
+        discovery belong upstream at [CluvexStudio/Aether](https://github.com/CluvexStudio/Aether).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The need or frustration behind the request — not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+    validations:
+      required: false

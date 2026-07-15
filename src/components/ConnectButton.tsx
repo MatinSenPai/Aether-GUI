@@ -110,6 +110,7 @@ export function ConnectButton() {
     <motion.button
       type="button"
       aria-label={ARIA_LABEL[phase]}
+      data-connect-anchor
       onClick={handleClick}
       disabled={status.state === "Disconnecting"}
       whileTap={{ scale: 0.97 }}
