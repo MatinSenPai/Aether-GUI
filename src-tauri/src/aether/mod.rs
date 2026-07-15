@@ -3,6 +3,7 @@ pub mod profiles;
 pub mod prompts;
 pub mod pty;
 pub mod status;
+pub mod downloader;
 
 use crate::error::AetherError;
 use crate::events::{now_millis, LogEvent, LOG_EVENT, STATUS_EVENT};
@@ -75,13 +76,53 @@ pub fn start_connect(
     manager: Arc<Mutex<AetherManager>>,
     profile_override: Option<ConnectionProfile>,
 ) -> Result<(), AetherError> {
-    // Resolve everything fallible that doesn't touch AetherManager's state
-    // first, so that once we transition to Launching below, the only
-    // remaining failure mode is pty::spawn itself — which is handled
-    // explicitly inside spawn_and_monitor rather than ever leaving the
-    // state machine stuck in Launching with no process behind it.
     let profile = profile_override.unwrap_or_else(|| profiles::load(&app));
-    let binary = resolve_binary(&app)?;
+    let binary = match resolve_binary(&app) {
+        Ok(b) => b,
+        Err(AetherError::BinaryMissing(path_str)) => {
+            // Check state before starting download to avoid overlapping downloads
+            {
+                let mut mgr = manager.lock().unwrap();
+                if !matches!(mgr.state, ConnectionState::Idle | ConnectionState::Error { .. }) {
+                    return Err(AetherError::AlreadyRunning);
+                }
+                mgr.state = ConnectionState::DownloadingBinary;
+                mgr.retry_count = 0;
+            }
+            let _ = app.emit(STATUS_EVENT, &ConnectionState::DownloadingBinary);
+
+            let expected_path = PathBuf::from(&path_str);
+            let dest_dir = expected_path.parent().unwrap().to_path_buf();
+            
+            let app_clone = app.clone();
+            let manager_clone = manager.clone();
+            let profile_clone = profile.clone();
+            let data_dir = app_data_dir(&app);
+            std::fs::create_dir_all(&data_dir).map_err(|e| AetherError::Internal(e.to_string()))?;
+
+            std::thread::spawn(move || {
+                match downloader::fetch_and_install(&dest_dir, &expected_path) {
+                    Ok(()) => {
+                        {
+                            let mut mgr = manager_clone.lock().unwrap();
+                            mgr.state = ConnectionState::Launching;
+                        }
+                        let _ = app_clone.emit(STATUS_EVENT, &ConnectionState::Launching);
+                        let _ = spawn_and_monitor(app_clone, manager_clone, expected_path, data_dir, profile_clone);
+                    }
+                    Err(e) => {
+                        set_state_and_emit(&app_clone, &manager_clone, ConnectionState::Error {
+                            message: format!("Failed to download binary: {}", e),
+                            phase: "downloading".into(),
+                        });
+                    }
+                }
+            });
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    };
+
     let data_dir = app_data_dir(&app);
     std::fs::create_dir_all(&data_dir).map_err(|e| AetherError::Internal(e.to_string()))?;
 
@@ -90,17 +131,10 @@ pub fn start_connect(
         if !matches!(mgr.state, ConnectionState::Idle | ConnectionState::Error { .. }) {
             return Err(AetherError::AlreadyRunning);
         }
-        // Defensive guard independent of the pid-file mechanism in orphan.rs
-        // (covers a manually-started Aether or a missing/corrupted pid file),
-        // checked under the same lock as the state check above so a rapid
-        // double-click can't race two connect() calls past this guard before
-        // the first transitions to Launching.
         if status::port_is_live() {
             return Err(AetherError::PortInUse(status::SOCKS_PORT));
         }
         mgr.state = ConnectionState::Launching;
-        // A fresh user-initiated connect always gets a full retry budget,
-        // independent of whatever happened on a previous, unrelated attempt.
         mgr.retry_count = 0;
     }
     let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);

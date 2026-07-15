@@ -62,6 +62,10 @@ export function ConnectionStatusLine() {
       primary = "Disconnected";
       secondary = "Click to connect";
       break;
+    case "DownloadingBinary":
+      primary = "Downloading Aether…";
+      secondary = "Setting up background service";
+      break;
     case "Launching":
       primary = "Starting Aether…";
       secondary = "Answering setup prompts";

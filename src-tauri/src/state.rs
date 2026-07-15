@@ -17,6 +17,7 @@ use std::sync::{Arc, Mutex};
 #[serde(tag = "state")]
 pub enum ConnectionState {
     Idle,
+    DownloadingBinary,
     Launching,
     Connecting,
     /// `connected_at_ms` is an absolute UNIX-epoch timestamp (ms) rather than
