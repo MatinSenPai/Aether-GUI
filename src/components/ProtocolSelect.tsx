@@ -24,11 +24,9 @@ const LABELS: Record<Protocol, string> = {
  * — changing it requires a full disconnect/reconnect.
  */
 export function ProtocolSelect() {
-  const status = useConnectionStore((s) => s.status);
+  const locked = useConnectionStore((s) => s.status.state !== "Idle" && s.status.state !== "Error");
   const protocol = useConnectionStore((s) => s.profile.protocol);
   const setProtocol = useConnectionStore((s) => s.setProtocol);
-
-  const locked = status.state !== "Idle" && status.state !== "Error";
 
   return (
     <Select

@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { useConnectionStore } from "@/state/connectionStore";
-
-const TEXT_TRANSITION = {
-  initial: { y: 4, opacity: 0 },
-  animate: { y: 0, opacity: 1 },
-  exit: { y: -4, opacity: 0 },
-  transition: { duration: 0.18, ease: [0.4, 0, 0.2, 1] as const },
-};
 
 function useElapsed(sinceMs: number | null): { formatted: string; totalSeconds: number } {
   const [now, setNow] = useState(() => Date.now());
@@ -24,24 +16,15 @@ function useElapsed(sinceMs: number | null): { formatted: string; totalSeconds: 
   return { formatted: `${h}:${m}:${s}`, totalSeconds: total };
 }
 
-/** Thin progress track under the status text, shown only while Connecting.
- * Determinate (fills toward Aether's own reported scan budget) once that
- * budget is known; an indeterminate sweep before then, so there's always
- * visible motion rather than a dead bar. */
 function ScanProgressBar({ percent }: { percent: number | null }) {
   return (
     <div className="h-1 w-40 overflow-hidden rounded-full bg-surface-2">
       {percent == null ? (
-        <motion.div
-          className="h-full w-1/3 rounded-full bg-status-connecting"
-          animate={{ x: ["-100%", "220%"] }}
-          transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-        />
+        <div className="progress-indeterminate h-full rounded-full bg-status-connecting" />
       ) : (
-        <motion.div
+        <div
           className="h-full rounded-full bg-status-connecting"
-          animate={{ width: `${percent}%` }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          style={{ width: `${percent}%`, transition: "width 400ms ease-out" }}
         />
       )}
     </div>
@@ -49,41 +32,21 @@ function ScanProgressBar({ percent }: { percent: number | null }) {
 }
 
 /**
- * All status text stays in the two neutral greys (--foreground /
- * --muted-foreground) regardless of connection state — only the
- * ConnectButton's ring/icon carries status color. This sidesteps every
- * marginal-contrast case a semantic status color would hit as small text
- * (verified during design: idle-grey as text measures 4.02:1, just under
- * AA's 4.5:1 minimum).
+ * All status text uses neutral greys (--foreground / --muted-foreground)
+ * regardless of connection state. Text transitions are handled by the parent
+ * React re-render (small DOM diff, no animation library needed).
  */
 export function ConnectionStatusLine() {
   const status = useConnectionStore((s) => s.status);
   const scanBudgetSecs = useConnectionStore((s) => s.scanBudgetSecs);
+  const attemptStartedAt = useConnectionStore((s) => s.attemptStartedAt);
   const connectedAt = status.state === "Connected" ? status.connected_at_ms : null;
   const elapsed = useElapsed(connectedAt).formatted;
 
-  // Route discovery can legitimately take up to ~2.5 minutes with nothing
-  // else changing on screen — a running timer (and, once Aether reports its
-  // own scan budget in its log stream, a real percentage) is the difference
-  // between "still working" and "looks hung", tracked from the moment a
-  // fresh attempt starts (Launching) through the whole Connecting wait.
-  // This reads the wall clock (Date.now()) on a specific state transition,
-  // which is an external-system read, not a state mirror — a genuine effect,
-  // not something derivable during render.
-  const [attemptStartedAt, setAttemptStartedAt] = useState<number | null>(null);
-  /* eslint-disable react-hooks/set-state-in-effect -- capturing Date.now()
-   * at the moment of transition; can't be computed during render. */
-  useEffect(() => {
-    if (status.state === "Launching") setAttemptStartedAt(Date.now());
-    else if (status.state === "Idle") setAttemptStartedAt(null);
-  }, [status.state]);
-  /* eslint-enable react-hooks/set-state-in-effect */
   const isAttempting = status.state === "Launching" || status.state === "Connecting";
   const { formatted: attemptElapsed, totalSeconds: attemptSeconds } = useElapsed(
     isAttempting ? attemptStartedAt : null,
   );
-  // Capped below 100 until the backend actually reports Connected — hitting
-  // 100% here would claim done before the state machine agrees.
   const scanPercent =
     scanBudgetSecs != null
       ? Math.min(99, Math.round((attemptSeconds / scanBudgetSecs) * 100))
@@ -132,24 +95,12 @@ export function ConnectionStatusLine() {
       aria-atomic="true"
       className="flex flex-col items-center gap-2 text-center"
     >
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={status.state}
-          className="block text-base font-medium text-foreground"
-          {...TEXT_TRANSITION}
-        >
-          {primary}
-        </motion.span>
-      </AnimatePresence>
-      <AnimatePresence mode="wait">
-        <motion.span
-          key={status.state}
-          className="block min-h-5 max-w-xs truncate font-mono text-xs text-muted-foreground"
-          {...TEXT_TRANSITION}
-        >
-          {secondary}
-        </motion.span>
-      </AnimatePresence>
+      <span className="block text-base font-medium text-foreground">
+        {primary}
+      </span>
+      <span className="block min-h-5 max-w-xs truncate font-mono text-xs text-muted-foreground">
+        {secondary}
+      </span>
       {status.state === "Connecting" && <ScanProgressBar percent={scanPercent} />}
     </div>
   );

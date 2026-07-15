@@ -19,6 +19,7 @@ interface ConnectionState {
    * lets the UI show real progress instead of an indefinite spinner. Reset
    * on every fresh attempt since it can differ by protocol/scan mode. */
   scanBudgetSecs: number | null;
+  attemptStartedAt: number | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   setProtocol: (protocol: ConnectionProfile["protocol"]) => void;
@@ -27,12 +28,13 @@ interface ConnectionState {
   retryAfterSidecarError: () => void;
 }
 
-export const useConnectionStore = create<ConnectionState>((set, get) => ({
+export const useConnectionStore = create<ConnectionState>()((set, get) => ({
   status: { state: "Idle" },
   profile: { protocol: "auto", scan_mode: "balanced", ip_version: "v4" },
   logs: [],
   sidecarError: null,
   scanBudgetSecs: null,
+  attemptStartedAt: null,
 
   connect: async () => {
     try {
@@ -92,7 +94,8 @@ export async function initConnectionListeners(): Promise<() => void> {
       useConnectionStore.setState({
         status: e.payload,
         // Fresh attempt — last attempt's budget no longer applies.
-        ...(e.payload.state === "Launching" ? { scanBudgetSecs: null } : {}),
+        ...(e.payload.state === "Launching" ? { scanBudgetSecs: null, attemptStartedAt: Date.now() } : {}),
+        ...(e.payload.state === "Idle" ? { attemptStartedAt: null } : {}),
       });
     }),
     listen<LogLine>("aether://log", (e) => {

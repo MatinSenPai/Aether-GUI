@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
 import { ChevronDown, Info, Settings2 } from "lucide-react";
 import {
   Collapsible,
@@ -7,7 +6,6 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Glass } from "@samasante/liquid-glass";
 import { ProtocolSelect } from "@/components/ProtocolSelect";
 import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
@@ -40,18 +38,10 @@ function FieldRow({
   );
 }
 
-/**
- * Collapsed by default — this *is* the auto-mode default: press Connect,
- * done. Everything configurable (the 3 real options Aether's TUI supports —
- * see aether/prompts.rs, nothing else exists to expose) plus the raw log
- * stream live behind this one disclosure.
- */
-export function AdvancedPanel() {
+function LogsViewer() {
   const logs = useConnectionStore((s) => s.logs);
-  const [open, setOpen] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (autoScroll && viewportRef.current) {
@@ -60,15 +50,38 @@ export function AdvancedPanel() {
   }, [logs, autoScroll]);
 
   return (
-    <motion.div
-      layout="position"
-      transition={
-        reduceMotion
-          ? { duration: 0 }
-          : { type: "spring", stiffness: 380, damping: 34, mass: 0.7 }
-      }
-      className="w-full max-w-sm"
-    >
+    <div className="overflow-hidden rounded-md border border-white/5 bg-black/10">
+      <div
+        ref={viewportRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+        }}
+        className="max-h-64 overflow-y-auto p-2 font-mono text-xs text-muted-foreground"
+      >
+        {logs.length === 0 ? (
+          <p className="text-status-idle">No output yet.</p>
+        ) : (
+          logs.map((l, i) => <p key={i}>{l.line}</p>)
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Collapsed by default — this *is* the auto-mode default: press Connect,
+ * done. The collapsible uses Radix's native CSS animation via data-state
+ * attributes instead of a JS animation library.
+ *
+ * All glass-surface effects have been replaced with plain CSS borders and
+ * backgrounds to eliminate the cost of backdrop-filter / compositing layers.
+ */
+export function AdvancedPanel() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="w-full max-w-sm">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger className="flex w-full items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary rounded-md">
           <Settings2 size={14} />
@@ -105,29 +118,11 @@ export function AdvancedPanel() {
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <Glass
-            className="block w-full overflow-hidden rounded-md"
-            radius={6}
-            optics={{ curvature: 0.16, depth: 0.72, frost: 0.6, glow: 0.12, sheen: 0.45, strength: 0.05 }}
-          >
-            <div
-              ref={viewportRef}
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
-              }}
-              className="max-h-64 overflow-y-auto bg-black/20 p-2 font-mono text-xs text-muted-foreground"
-            >
-              {logs.length === 0 ? (
-                <p className="text-status-idle">No output yet.</p>
-              ) : (
-                logs.map((l, i) => <p key={i}>{l.line}</p>)
-              )}
-            </div>
-          </Glass>
+          {/* Plain border surface — no Glass/liquid-glass, no backdrop-filter (expensive) */}
+          <LogsViewer />
           </div>
         </CollapsibleContent>
       </Collapsible>
-    </motion.div>
+    </div>
   );
 }
