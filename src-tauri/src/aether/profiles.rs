@@ -96,7 +96,7 @@ pub fn load(app: &tauri::AppHandle) -> ConnectionProfile {
     use tauri_plugin_store::StoreExt;
     app.store(STORE_FILE)
         .ok()
-        .and_then(|s| s.get(STORE_KEY).cloned())
+        .and_then(|s| s.get(STORE_KEY))
         .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default()
 }

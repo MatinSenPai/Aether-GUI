@@ -38,7 +38,7 @@ export function ProtocolSelect() {
     >
       <SelectTrigger
         size="sm"
-        className="w-48 border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-surface-2"
+        className="w-full border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-surface-2"
         aria-label="Protocol"
       >
         <SelectValue />

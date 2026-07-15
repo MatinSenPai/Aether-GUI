@@ -14,9 +14,16 @@ interface ConnectionState {
   profile: ConnectionProfile;
   logs: LogLine[];
   sidecarError: string | null;
+  /** Aether's own route-probe budget in seconds, parsed live out of its log
+   * stream (its prober logs e.g. "...budget=120s" once scanning starts) —
+   * lets the UI show real progress instead of an indefinite spinner. Reset
+   * on every fresh attempt since it can differ by protocol/scan mode. */
+  scanBudgetSecs: number | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   setProtocol: (protocol: ConnectionProfile["protocol"]) => void;
+  setScanMode: (scan_mode: ConnectionProfile["scan_mode"]) => void;
+  setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -25,6 +32,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   profile: { protocol: "auto", scan_mode: "balanced", ip_version: "v4" },
   logs: [],
   sidecarError: null,
+  scanBudgetSecs: null,
 
   connect: async () => {
     try {
@@ -55,21 +63,35 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   setProtocol: (protocol) =>
     set((s) => ({ profile: { ...s.profile, protocol } })),
 
+  setScanMode: (scan_mode) =>
+    set((s) => ({ profile: { ...s.profile, scan_mode } })),
+
+  setIpVersion: (ip_version) =>
+    set((s) => ({ profile: { ...s.profile, ip_version } })),
+
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
   // sidecarError if the binary is still missing.
   retryAfterSidecarError: () => set({ sidecarError: null }),
 }));
 
+const BUDGET_RE = /budget=(\d+)s/;
+
 /** Call once from App's top-level effect; returns a cleanup function. */
 export async function initConnectionListeners(): Promise<() => void> {
   const [unlistenStatus, unlistenLog] = await Promise.all([
     listen<ConnectionStatus>("aether://status", (e) => {
-      useConnectionStore.setState({ status: e.payload });
+      useConnectionStore.setState({
+        status: e.payload,
+        // Fresh attempt — last attempt's budget no longer applies.
+        ...(e.payload.state === "Launching" ? { scanBudgetSecs: null } : {}),
+      });
     }),
     listen<LogLine>("aether://log", (e) => {
+      const budgetMatch = BUDGET_RE.exec(e.payload.line);
       useConnectionStore.setState((s) => ({
         logs: [...s.logs.slice(-(MAX_LOG_LINES - 1)), e.payload],
+        ...(budgetMatch ? { scanBudgetSecs: Number(budgetMatch[1]) } : {}),
       }));
     }),
   ]);

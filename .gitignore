@@ -9,6 +9,10 @@ src-tauri/binaries/aether.exe
 src-tauri/binaries/*.tar.gz
 src-tauri/binaries/*.zip
 src-tauri/binaries/SHA256SUMS.txt
+# Aether writes its provisioned device identity (private keys, access
+# tokens) here when run with binaries/ as its cwd (e.g. manual testing) —
+# must never be committed.
+src-tauri/binaries/*.toml
 *.log
 .vscode/*
 !.vscode/extensions.json
