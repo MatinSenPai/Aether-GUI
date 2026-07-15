@@ -15,9 +15,11 @@
         "title": "Aether-GUI",
         "width": 420,
         "height": 640,
-        "resizable": false,
+        "resizable": true,
+        "minWidth": 360,
+        "minHeight": 480,
         "center": true,
-        "decorations": false,
+        "decorations": true,
         "backgroundColor": "#0D0D0F"
       }
     ],

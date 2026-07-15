@@ -46,5 +46,6 @@ pub static PROMPT_TABLE: &[PromptRule] = &[
 /// (default 2): ", etc. — always ends with a colon, no trailing newline
 /// since it's waiting for input right after printing this).
 pub fn looks_like_choice_prompt(partial_line: &str) -> bool {
-    partial_line.trim_end().ends_with(':')
+    let cleaned = partial_line.trim_end();
+    cleaned.ends_with(':') || cleaned.contains("Choose [")
 }

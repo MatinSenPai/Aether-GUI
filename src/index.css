@@ -134,6 +134,8 @@
 
 /* --- Screen transitions (App) --- */
 .screen-transition {
+  position: absolute;
+  inset: 0;
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -160,23 +162,56 @@
   height: 260px;
   top: -60px;
   right: -60px;
-  background: radial-gradient(circle, var(--color-primary) 0%, transparent 70%);
-  filter: blur(40px);
-  opacity: 0.16;
+  background: radial-gradient(
+    circle at center,
+    rgba(242, 113, 28, 0.16) 0%,
+    rgba(242, 113, 28, 0.11) 25%,
+    rgba(242, 113, 28, 0.05) 55%,
+    rgba(242, 113, 28, 0.01) 80%,
+    rgba(242, 113, 28, 0) 100%
+  );
+  opacity: 1;
+  animation: float-a 25s infinite ease-in-out;
 }
 .orb-b {
   width: 220px;
   height: 220px;
   bottom: -40px;
   left: -80px;
-  background: radial-gradient(circle, var(--color-status-connected) 0%, transparent 70%);
-  filter: blur(40px);
-  opacity: 0.12;
+  background: radial-gradient(
+    circle at center,
+    rgba(45, 212, 191, 0.12) 0%,
+    rgba(45, 212, 191, 0.08) 25%,
+    rgba(45, 212, 191, 0.04) 55%,
+    rgba(45, 212, 191, 0.01) 80%,
+    rgba(45, 212, 191, 0) 100%
+  );
+  opacity: 1;
+  animation: float-b 30s infinite ease-in-out;
+}
+
+@keyframes float-a {
+  0% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.1); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+@keyframes float-b {
+  0% { transform: translate(0px, 0px) scale(1); }
+  50% { transform: translate(-25px, 30px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
 }
 
 /* --- Connect button --- */
+.connect-btn {
+  transition: transform 0.22s cubic-bezier(0.25, 0.8, 0.25, 1),
+              box-shadow 0.22s cubic-bezier(0.25, 0.8, 0.25, 1),
+              background-color 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.connect-btn:hover {
+  transform: scale(1.03);
+}
 .connect-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.97) !important;
 }
 .connect-btn[data-phase="idle"] {
   box-shadow: 0 0 0 3px var(--color-status-idle);
@@ -187,7 +222,8 @@
               0 0 14px 1px color-mix(in oklch, var(--color-status-connecting) 50%, transparent);
 }
 .connect-btn[data-phase="connected"] {
-  box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-status-connected) 40%, transparent);
+  box-shadow: 0 0 0 2px var(--color-status-connected),
+              0 0 20px 2px color-mix(in oklch, var(--color-status-connected) 35%, transparent);
 }
 .connect-btn[data-phase="error"] {
   animation: connectShake 0.4s ease-in-out;
@@ -227,7 +263,15 @@
 
 /* --- Connection status progress bar --- */
 .progress-indeterminate {
-  width: 100%;
+  animation: progressSlide 1.5s infinite linear;
+  background: linear-gradient(90deg, transparent, var(--color-status-connecting) 50%, transparent);
+  width: 50%;
+  will-change: transform;
+}
+
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
 }
 
 /* --- prefers-reduced-motion overrides --- */
@@ -238,6 +282,10 @@
   .orb-a { opacity: 0.16; }
   .orb-b { opacity: 0.12; }
 
+  .connect-btn {
+    animation: none;
+    transform: none !important;
+  }
   .connect-btn[data-phase="connecting"],
   .connect-btn[data-phase="connected"] {
     animation: none;
@@ -252,6 +300,54 @@
 
   .progress-indeterminate {
     animation: none;
-    width: 33%;
+    width: 100%;
+    background: var(--color-status-connecting);
+  }
+}
+
+/* --- Custom Scrollbar for Logs panel --- */
+.logs-viewport::-webkit-scrollbar {
+  width: 5px;
+}
+.logs-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.logs-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 99px;
+}
+.logs-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* --- Compact Height Responsiveness --- */
+@media (max-height: 580px) {
+  /* Scale down ConnectButton */
+  .connect-btn {
+    width: 7rem !important; /* size-28 */
+    height: 7rem !important;
+  }
+  .connect-btn svg {
+    width: 2rem !important; /* size-8 */
+    height: 2rem !important;
+  }
+  /* Reduce logs height */
+  .logs-viewport {
+    max-height: 5rem !important; /* ~80px */
+  }
+  /* Scale down spacing & paddings */
+  .p-6 {
+    padding: 0.75rem !important; /* p-3 */
+  }
+  .gap-6 {
+    gap: 0.75rem !important; /* gap-3 */
+  }
+  .size-40 {
+    width: 7rem !important;
+    height: 7rem !important;
+  }
+  .size-12 {
+    width: 2rem !important;
+    height: 2rem !important;
   }
 }

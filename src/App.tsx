@@ -5,17 +5,19 @@ import { AdvancedPanel } from "@/components/AdvancedPanel";
 import { Backdrop } from "@/components/three/Backdrop";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { TitleBar } from "@/components/TitleBar";
 import { initConnectionListeners, useConnectionStore } from "@/state/connectionStore";
 
 function MainScreen() {
   return (
-    <div className="relative z-10 flex h-full flex-col items-center p-6">
-      <div className="flex flex-1 flex-col items-center justify-center gap-6">
+    <div className="relative z-10 flex h-full w-full flex-col sm:flex-row items-center sm:items-stretch sm:justify-center gap-8 p-6 max-w-4xl mx-auto overflow-y-auto scrollbar-none">
+      <div className="flex flex-1 flex-col items-center justify-center gap-6 sm:w-1/2">
         <ConnectButton />
         <ConnectionStatusLine />
       </div>
-      <AdvancedPanel />
+      <div className="hidden sm:block w-px bg-border/20 self-stretch my-6" />
+      <div className="w-full max-w-sm sm:max-w-md sm:flex-1 sm:flex sm:flex-col sm:justify-center sm:w-1/2 sm:min-h-0">
+        <AdvancedPanel />
+      </div>
     </div>
   );
 }
@@ -42,7 +44,6 @@ export function App() {
     <TooltipProvider>
       <div className="relative flex h-svh w-full flex-col overflow-hidden bg-background">
         <Backdrop />
-        <TitleBar />
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <div
             className="screen-transition"

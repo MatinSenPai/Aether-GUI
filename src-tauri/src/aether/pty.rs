@@ -138,6 +138,9 @@ fn read_loop(
                     current_section = Some(rule.id);
                 }
             }
+            if line.contains("hunting for a working") {
+                prompts_done.store(true, Ordering::Relaxed);
+            }
             let _ = log_tx.send(LogEvent { line, timestamp: now_millis() });
         }
 
@@ -174,14 +177,36 @@ fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\u{1b}' && chars.peek() == Some(&'[') {
-            chars.next();
-            for c2 in chars.by_ref() {
-                if c2.is_ascii_alphabetic() {
-                    break;
+        if c == '\u{1b}' {
+            match chars.peek() {
+                Some(&'[') => {
+                    chars.next();
+                    for c2 in chars.by_ref() {
+                        if c2.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                    continue;
                 }
+                Some(&']') => {
+                    chars.next();
+                    let mut st_escaped = false;
+                    for c2 in chars.by_ref() {
+                        if c2 == '\x07' {
+                            break;
+                        }
+                        if c2 == '\u{1b}' {
+                            st_escaped = true;
+                        } else if st_escaped && c2 == '\\' {
+                            break;
+                        } else {
+                            st_escaped = false;
+                        }
+                    }
+                    continue;
+                }
+                _ => {}
             }
-            continue;
         }
         out.push(c);
     }

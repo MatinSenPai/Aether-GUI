@@ -43,6 +43,8 @@ export function ConnectionStatusLine() {
   const connectedAt = status.state === "Connected" ? status.connected_at_ms : null;
   const elapsed = useElapsed(connectedAt).formatted;
 
+  const [copied, setCopied] = useState(false);
+
   const isAttempting = status.state === "Launching" || status.state === "Connecting";
   const { formatted: attemptElapsed, totalSeconds: attemptSeconds } = useElapsed(
     isAttempting ? attemptStartedAt : null,
@@ -53,7 +55,7 @@ export function ConnectionStatusLine() {
       : null;
 
   let primary: string;
-  let secondary: string;
+  let secondary: React.ReactNode;
 
   switch (status.state) {
     case "Idle":
@@ -75,10 +77,28 @@ export function ConnectionStatusLine() {
       primary = "Reconnecting…";
       secondary = `Attempt ${status.attempt} of ${status.max_attempts}`;
       break;
-    case "Connected":
+    case "Connected": {
       primary = "Connected";
-      secondary = elapsed;
+      const socksAddr = `socks5://${status.socks_addr}`;
+      secondary = copied ? (
+        <span className="text-status-connected transition-colors duration-200">
+          Copied to clipboard!
+        </span>
+      ) : (
+        <button
+          onClick={() => {
+            void navigator.clipboard.writeText(socksAddr);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          title="Click to copy SOCKS5 address"
+          className="hover:text-foreground cursor-pointer transition-colors focus-visible:outline-none focus-visible:underline"
+        >
+          {socksAddr} · {elapsed}
+        </button>
+      );
       break;
+    }
     case "Disconnecting":
       primary = "Disconnecting…";
       secondary = "";

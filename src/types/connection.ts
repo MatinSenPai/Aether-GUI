@@ -21,6 +21,7 @@ export interface ConnectionProfile {
 }
 
 export interface LogLine {
+  id: string;
   line: string;
   timestamp: number;
 }

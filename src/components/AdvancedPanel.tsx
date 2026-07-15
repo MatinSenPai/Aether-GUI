@@ -57,12 +57,12 @@ function LogsViewer() {
           const el = e.currentTarget;
           setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
         }}
-        className="max-h-64 overflow-y-auto p-2 font-mono text-xs text-muted-foreground"
+        className="logs-viewport max-h-64 overflow-y-auto p-2 font-mono text-xs text-muted-foreground"
       >
         {logs.length === 0 ? (
           <p className="text-status-idle">No output yet.</p>
         ) : (
-          logs.map((l, i) => <p key={i}>{l.line}</p>)
+          logs.map((l) => <p key={l.id}>{l.line}</p>)
         )}
       </div>
     </div>
@@ -81,7 +81,7 @@ export function AdvancedPanel() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-sm">
+    <div className="w-full max-w-sm mx-auto sm:max-w-none">
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger className="flex w-full items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary rounded-md">
           <Settings2 size={14} />
