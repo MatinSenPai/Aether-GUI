@@ -76,6 +76,10 @@ pub fn spawn(
     for arg in profile.as_args() {
         cmd.arg(arg);
     }
+    // Env var, not a flag (see ConnectionProfile::masque_http2's doc-comment):
+    // any value suppresses Aether 1.2.0's interactive "MASQUE transport"
+    // prompt, and only a truthy one selects HTTP/2.
+    cmd.env("AETHER_MASQUE_HTTP2", if profile.masque_http2 { "1" } else { "0" });
 
     let child = pair
         .slave

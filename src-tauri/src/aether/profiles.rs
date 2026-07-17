@@ -77,6 +77,13 @@ pub struct ConnectionProfile {
     /// by older versions of this app loading cleanly.
     #[serde(default = "default_true")]
     pub quick_reconnect: bool,
+    /// Aether ≥1.2.0: run the MASQUE tunnel over HTTP/2 (TCP) instead of the
+    /// default HTTP/3 (QUIC) — for networks that block or throttle UDP.
+    /// Passed as the AETHER_MASQUE_HTTP2 env var, not a flag: there is no
+    /// `--h3` flag, and setting the env to any value also suppresses 1.2.0's
+    /// new interactive "MASQUE transport" prompt in both directions.
+    #[serde(default)]
+    pub masque_http2: bool,
 }
 
 fn default_true() -> bool {
@@ -122,6 +129,7 @@ impl Default for ConnectionProfile {
             scan_mode: ScanMode::Balanced,
             ip_version: IpVersion::V4,
             quick_reconnect: true,
+            masque_http2: false,
         }
     }
 }

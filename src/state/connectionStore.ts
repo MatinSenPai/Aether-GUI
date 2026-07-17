@@ -25,12 +25,19 @@ interface ConnectionState {
   setScanMode: (scan_mode: ConnectionProfile["scan_mode"]) => void;
   setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
   setQuickReconnect: (quick_reconnect: boolean) => void;
+  setMasqueHttp2: (masque_http2: boolean) => void;
   retryAfterSidecarError: () => void;
 }
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   status: { state: "Idle" },
-  profile: { protocol: "auto", scan_mode: "balanced", ip_version: "v4", quick_reconnect: true },
+  profile: {
+    protocol: "auto",
+    scan_mode: "balanced",
+    ip_version: "v4",
+    quick_reconnect: true,
+    masque_http2: false,
+  },
   logs: [],
   sidecarError: null,
   scanBudgetSecs: null,
@@ -72,6 +79,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setQuickReconnect: (quick_reconnect) =>
     set((s) => ({ profile: { ...s.profile, quick_reconnect } })),
+
+  setMasqueHttp2: (masque_http2) =>
+    set((s) => ({ profile: { ...s.profile, masque_http2 } })),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set

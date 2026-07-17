@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { ProtocolSelect } from "@/components/ProtocolSelect";
 import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
+import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -41,9 +42,9 @@ function FieldRow({
 
 /**
  * Collapsed by default — this *is* the auto-mode default: press Connect,
- * done. Everything configurable (the 3 real options Aether's TUI supports —
- * see aether/prompts.rs, nothing else exists to expose) plus the raw log
- * stream live behind this one disclosure.
+ * done. Everything configurable (the options Aether's own interactive setup
+ * exposes — see aether/prompts.rs and profiles.rs, nothing else) plus the
+ * raw log stream live behind this one disclosure.
  *
  * Deliberately animation-light: opening used to stack a Motion layout
  * spring, a 300ms tw-animate slide, an instant column reflow, and three
@@ -95,6 +96,12 @@ export function AdvancedPanel() {
               tooltip="Which address families to search for working routes. IPv4 is the safest default on most networks."
             >
               <IpVersionToggle />
+            </FieldRow>
+            <FieldRow
+              label="MASQUE Transport"
+              tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
+            >
+              <MasqueTransportToggle />
             </FieldRow>
 
             <div className="flex items-center justify-between">

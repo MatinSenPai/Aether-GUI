@@ -21,6 +21,9 @@ export interface ConnectionProfile {
   /** Aether ≥1.1.1: reuse the last known-working gateway with a quick
    * recheck instead of a full scan. */
   quick_reconnect: boolean;
+  /** Aether ≥1.2.0: run MASQUE over HTTP/2 (TCP) instead of the default
+   * HTTP/3 (QUIC) — for networks that block or throttle UDP. */
+  masque_http2: boolean;
 }
 
 export interface LogLine {

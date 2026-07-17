@@ -39,6 +39,15 @@ pub static PROMPT_TABLE: &[PromptRule] = &[
         header_matches: |l| l.trim_end().ends_with("IP version to scan:"),
         answer: |p| p.ip_version.as_menu_choice().to_string(),
     },
+    // Aether 1.2.0's MASQUE-only transport menu. Normally suppressed by the
+    // AETHER_MASQUE_HTTP2 env var set at spawn (pty.rs) — fallback only.
+    // Suffix match can't collide with the "[+] MASQUE transport: HTTP/…"
+    // info-log line: that one continues past the colon.
+    PromptRule {
+        id: "masque_transport",
+        header_matches: |l| l.trim_end().ends_with("MASQUE transport:"),
+        answer: |p| if p.masque_http2 { "2" } else { "1" }.to_string(),
+    },
 ];
 
 /// True for a line that looks like Aether blocking on stdin for a menu
