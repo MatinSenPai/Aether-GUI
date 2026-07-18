@@ -62,6 +62,11 @@ export function AdvancedPanel() {
   const setLocalPort = useConnectionStore((s) => s.setLocalPort);
   const [portDraft, setPortDraft] = useState(String(localPort));
   const [open, setOpen] = useState(false);
+  // Logs get their own accordion, independent of `open` above — collapsing
+  // it must never touch the Advanced panel's own open/closed state, and
+  // vice versa. Starts closed: the log stream is the one thing here that's
+  // rarely needed, so it shouldn't push everything else down by default.
+  const [logsOpen, setLogsOpen] = useState(false);
   // Launch flag — locked mid-session like the other profile controls.
   const locked = status.state !== "Idle" && status.state !== "Error";
   const [autoScroll, setAutoScroll] = useState(true);
@@ -97,6 +102,15 @@ export function AdvancedPanel() {
       viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
+
+  // Radix's CollapsibleContent unmounts the viewport while closed, so
+  // reopening needs its own scroll-to-bottom rather than relying on the
+  // effect above (whose deps won't have changed just because it remounted).
+  useEffect(() => {
+    if (logsOpen && autoScroll && viewportRef.current) {
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
+    }
+  }, [logsOpen, autoScroll]);
 
   useEffect(() => {
     setPortDraft(String(localPort));
@@ -262,28 +276,36 @@ export function AdvancedPanel() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                Logs
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            <div
-              ref={viewportRef}
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
-              }}
-              className="max-h-64 overflow-y-auto rounded-md bg-black/20 p-2 font-mono text-xs text-muted-foreground ring-1 ring-white/10"
-            >
-              {logs.length === 0 ? (
-                <p className="text-status-idle">No output yet.</p>
-              ) : (
-                logs.map((l, i) => <p key={i}>{l.line}</p>)
-              )}
-            </div>
+            <Collapsible open={logsOpen} onOpenChange={setLogsOpen} className="flex flex-col gap-2">
+              <CollapsibleTrigger className="flex w-full items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md group">
+                <div className="h-px flex-1 bg-border" />
+                <span className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground uppercase group-hover:text-foreground">
+                  Logs{logs.length > 0 && ` (${logs.length})`}
+                  <ChevronDown
+                    size={12}
+                    className="transition-transform duration-150 data-[state=open]:rotate-180"
+                    data-state={logsOpen ? "open" : "closed"}
+                  />
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-1 data-[state=open]:duration-150 data-[state=open]:[animation-timing-function:cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-100">
+                <div
+                  ref={viewportRef}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    setAutoScroll(el.scrollHeight - el.scrollTop - el.clientHeight < 24);
+                  }}
+                  className="max-h-64 overflow-y-auto rounded-md bg-black/20 p-2 font-mono text-xs text-muted-foreground ring-1 ring-white/10"
+                >
+                  {logs.length === 0 ? (
+                    <p className="text-status-idle">No output yet.</p>
+                  ) : (
+                    logs.map((l, i) => <p key={i}>{l.line}</p>)
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         </CollapsibleContent>
       </Collapsible>
