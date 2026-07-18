@@ -1,6 +1,7 @@
 use crate::events::now_millis;
 use crate::settings;
 use crate::state::{AppState, ConnectionState};
+use crate::sysproxy::ProxyStatus;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -42,6 +43,7 @@ fn icon_bytes(category: &str) -> &'static [u8] {
         "connected" => include_bytes!("../icons/tray/connected.png"),
         "error" => include_bytes!("../icons/tray/error.png"),
         "busy" => include_bytes!("../icons/tray/busy.png"),
+        "proxy_active" => include_bytes!("../icons/tray/proxy_active.png"),
         _ => include_bytes!("../icons/tray/idle.png"),
     }
 }
@@ -70,8 +72,12 @@ fn tooltip_text(state: &ConnectionState) -> String {
         ConnectionState::Idle => "Aether-GUI · Idle".into(),
         ConnectionState::Launching => "Aether-GUI · Starting…".into(),
         ConnectionState::Connecting => "Aether-GUI · Finding a route…".into(),
-        ConnectionState::Connected { connected_at_ms, .. } => {
-            format!("Aether-GUI · Connected · {}", format_elapsed(*connected_at_ms))
+        ConnectionState::Connected { connected_at_ms, profile_summary, .. } => {
+            format!(
+                "Aether-GUI · Connected · {} · {}",
+                profile_summary,
+                format_elapsed(*connected_at_ms)
+            )
         }
         ConnectionState::Reconnecting { attempt, max_attempts } => {
             format!("Aether-GUI · Reconnecting ({attempt}/{max_attempts})")
@@ -196,9 +202,10 @@ pub fn on_state_change(app: &AppHandle, previous: &ConnectionState, new_state: &
     notify(app, previous, new_state);
     update_connection_actions(new_state);
 
-    if let ConnectionState::Connected { connected_at_ms, .. } = new_state {
+    if let ConnectionState::Connected { connected_at_ms, profile_summary, .. } = new_state {
         let app = app.clone();
         let connected_at_ms = *connected_at_ms;
+        let profile_summary = profile_summary.clone();
         std::thread::spawn(move || loop {
             std::thread::sleep(Duration::from_secs(1));
             // A newer transition happened — stop, the new one already
@@ -208,7 +215,8 @@ pub fn on_state_change(app: &AppHandle, previous: &ConnectionState, new_state: &
             }
             if let Some(tray) = app.tray_by_id(TRAY_ID) {
                 let _ = tray.set_tooltip(Some(format!(
-                    "Aether-GUI · Connected · {}",
+                    "Aether-GUI · Connected · {} · {}",
+                    profile_summary,
                     format_elapsed(connected_at_ms)
                 )));
             }
@@ -221,13 +229,37 @@ pub fn on_state_change(app: &AppHandle, previous: &ConnectionState, new_state: &
 /// Pause/Resume label always mirror the real, currently-in-effect
 /// preference regardless of which surface (window, tray checkbox, tray
 /// Pause item) last changed it.
-pub fn sync_system_proxy(app: &AppHandle, _conn_state: &ConnectionState, user_enabled: bool) {
-    let items = TRAY_ITEMS.lock().unwrap();
-    let Some(items) = items.as_ref() else { return };
-    let _ = items.system_proxy.set_checked(user_enabled);
-    let _ = items
-        .pause_resume
-        .set_text(if user_enabled { "Pause Protection" } else { "Resume Protection" });
+///
+/// Icon: connection state (idle/connected/busy/error — same as before) is
+/// still the base color. System-proxy-Active is layered on top as a purple
+/// accent, since it's a genuinely different fact ("traffic is actually
+/// being routed through us right now") — not a replacement for the
+/// connection color. The moment the proxy goes back off (user toggle, or a
+/// disconnect), this repaints using the connection color again, since that
+/// path (a pure toggle with no connection-state change) is the only call
+/// that would otherwise leave a stale purple icon behind.
+pub fn sync_system_proxy(
+    app: &AppHandle,
+    conn_state: &ConnectionState,
+    user_enabled: bool,
+    status: ProxyStatus,
+) {
+    {
+        let items = TRAY_ITEMS.lock().unwrap();
+        if let Some(items) = items.as_ref() {
+            let _ = items.system_proxy.set_checked(user_enabled);
+            let _ = items
+                .pause_resume
+                .set_text(if user_enabled { "Pause Protection" } else { "Resume Protection" });
+        }
+    }
+    let icon_category =
+        if status == ProxyStatus::Active { "proxy_active" } else { category(conn_state) };
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        if let Ok(icon) = Image::from_bytes(icon_bytes(icon_category)) {
+            let _ = tray.set_icon(Some(icon));
+        }
+    }
 }
 
 fn update_connection_actions(state: &ConnectionState) {
@@ -255,7 +287,9 @@ fn notify(app: &AppHandle, previous: &ConnectionState, new_state: &ConnectionSta
     use tauri_plugin_notification::NotificationExt;
 
     let body: Option<String> = match (previous, new_state) {
-        (_, ConnectionState::Connected { .. }) => Some("Connected.".into()),
+        (_, ConnectionState::Connected { profile_summary, .. }) => {
+            Some(format!("Connected — {profile_summary}"))
+        }
         (ConnectionState::Connected { .. } | ConnectionState::Disconnecting, ConnectionState::Idle) => {
             Some("Disconnected.".into())
         }

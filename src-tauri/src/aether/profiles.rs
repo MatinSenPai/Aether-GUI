@@ -22,6 +22,16 @@ impl Protocol {
             Protocol::Gool => "3",
         }
     }
+
+    /// Short label for display (tray tooltip, notifications, status line).
+    pub fn label(&self) -> &'static str {
+        match self {
+            Protocol::Auto => "auto",
+            Protocol::Masque => "masque",
+            Protocol::Wireguard => "wireguard",
+            Protocol::Gool => "gool",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -42,6 +52,15 @@ impl ScanMode {
             ScanMode::Stealth => "4",
         }
     }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            ScanMode::Turbo => "turbo",
+            ScanMode::Balanced => "balanced",
+            ScanMode::Thorough => "thorough",
+            ScanMode::Stealth => "stealth",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -58,6 +77,14 @@ impl IpVersion {
             IpVersion::V4 => "1",
             IpVersion::V6 => "2",
             IpVersion::Both => "3",
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            IpVersion::V4 => "ipv4",
+            IpVersion::V6 => "ipv6",
+            IpVersion::Both => "dual",
         }
     }
 }
@@ -142,6 +169,13 @@ impl ConnectionProfile {
             args.push(format!("127.0.0.1:{}", self.local_port));
         }
         args
+    }
+
+    /// e.g. "wireguard+turbo+ipv4" — shown in the status line, tray tooltip,
+    /// and the connected notification so the user can see at a glance what
+    /// they're actually running, without opening Advanced.
+    pub fn summary(&self) -> String {
+        format!("{}+{}+{}", self.protocol.label(), self.scan_mode.label(), self.ip_version.label())
     }
 }
 

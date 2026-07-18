@@ -98,6 +98,7 @@ export function ConnectionStatusLine() {
 
   let primary: string;
   let secondary: string;
+  let tertiary = "";
 
   switch (status.state) {
     case "Idle":
@@ -122,6 +123,7 @@ export function ConnectionStatusLine() {
     case "Connected":
       primary = "Connected";
       secondary = elapsed;
+      tertiary = status.profile_summary;
       break;
     case "Disconnecting":
       primary = "Disconnecting…";
@@ -158,6 +160,17 @@ export function ConnectionStatusLine() {
         </motion.span>
       </AnimatePresence>
       {status.state === "Connecting" && <ScanProgressBar percent={scanPercent} />}
+      {tertiary && (
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={`tertiary-${status.state}`}
+            className="block font-mono text-[10px] tracking-wide text-muted-foreground/60 uppercase"
+            {...TEXT_TRANSITION}
+          >
+            {tertiary}
+          </motion.span>
+        </AnimatePresence>
+      )}
     </div>
   );
 }

@@ -292,6 +292,7 @@ fn monitor_connect(
             let new_state = ConnectionState::Connected {
                 socks_addr: format!("127.0.0.1:{}", profile.local_port),
                 connected_at_ms: now_millis(),
+                profile_summary: profile.summary(),
             };
             let previous_state = mgr.state.clone();
             mgr.state = new_state.clone();

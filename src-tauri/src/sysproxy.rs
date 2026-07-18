@@ -1,6 +1,7 @@
 use crate::settings;
 use crate::state::ConnectionState;
 use serde::Serialize;
+use std::sync::Mutex;
 use tauri::{AppHandle, Emitter};
 
 /// Emitted every time the *user's* system-proxy preference changes (from
@@ -14,6 +15,30 @@ pub const SYSTEM_PROXY_EVENT: &str = "aether://system-proxy";
 #[derive(Serialize, Clone, Debug)]
 pub struct SystemProxyPayload {
     pub enabled: bool,
+}
+
+/// What the OS proxy setting is actually doing right now, as opposed to
+/// what the user asked for — the two can differ (e.g. wanted-on but no
+/// tunnel up yet, or wanted-on but the registry write itself failed). This
+/// is what the tray icon's color follows (see tray::category_for_proxy),
+/// since "green" should mean traffic is really being routed through us,
+/// not merely that the user flipped a switch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProxyStatus {
+    /// Not pointed at us right now — either the user turned it off, or
+    /// there's no live tunnel to point it at. Not an error.
+    Inactive,
+    /// Successfully pointed the OS proxy at our local SOCKS5 port.
+    Active,
+    /// The user wants it on and a tunnel is up, but writing the registry
+    /// value itself failed (e.g. permissions) — traffic is NOT protected.
+    Error,
+}
+
+static LAST_STATUS: Mutex<ProxyStatus> = Mutex::new(ProxyStatus::Inactive);
+
+pub fn current_status() -> ProxyStatus {
+    *LAST_STATUS.lock().unwrap()
 }
 
 /// Pulls the SOCKS port out of `ConnectionState::Connected`, if we're in it.
@@ -31,13 +56,22 @@ fn connected_port(state: &ConnectionState) -> Option<u16> {
 /// wants it. Called after every connection-state transition (with the
 /// user's stored preference) and after every user toggle/tray action (with
 /// the tunnel's current state) — either input changing re-derives the same
-/// answer, so the two can never drift out of sync.
-fn apply(app: &AppHandle, conn_state: &ConnectionState, user_enabled: bool) {
-    match connected_port(conn_state) {
-        Some(port) if user_enabled => imp::enable(port),
-        _ => imp::restore(),
-    }
-    crate::tray::sync_system_proxy(app, conn_state, user_enabled);
+/// answer, so the two can never drift out of sync. Returns the resulting
+/// `ProxyStatus` so callers (and the tray icon) can reflect what actually
+/// happened, not just what was requested.
+fn apply(app: &AppHandle, conn_state: &ConnectionState, user_enabled: bool) -> ProxyStatus {
+    let status = match connected_port(conn_state) {
+        Some(port) if user_enabled => {
+            if imp::enable(port) { ProxyStatus::Active } else { ProxyStatus::Error }
+        }
+        _ => {
+            imp::restore();
+            ProxyStatus::Inactive
+        }
+    };
+    *LAST_STATUS.lock().unwrap() = status;
+    crate::tray::sync_system_proxy(app, conn_state, user_enabled, status);
+    status
 }
 
 /// Called from `aether::set_state_and_emit` (and the two other places a
@@ -104,7 +138,7 @@ mod imp {
         RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(SUBKEY, KEY_READ | KEY_WRITE)
     }
 
-    pub fn enable(port: u16) {
+    pub fn enable(port: u16) -> bool {
         let mut saved = SAVED.lock().unwrap();
         // Already own it (e.g. re-applying the same desired state after an
         // unrelated transition) — don't overwrite the real original values
@@ -112,13 +146,12 @@ mod imp {
         // port/server value in case it changed (a reconnect can land on a
         // different local port), so do that unconditionally before bailing.
         if let Some(_existing) = saved.as_ref() {
-            if let Ok(key) = open_internet_settings() {
-                let _ = key.set_value("ProxyServer", &format!("socks=127.0.0.1:{port}"));
-                broadcast_settings_changed();
-            }
-            return;
+            let Ok(key) = open_internet_settings() else { return false };
+            let ok = key.set_value("ProxyServer", &format!("socks=127.0.0.1:{port}")).is_ok();
+            broadcast_settings_changed();
+            return ok;
         }
-        let Ok(key) = open_internet_settings() else { return };
+        let Ok(key) = open_internet_settings() else { return false };
 
         let previous = SavedProxyState {
             proxy_enable: key.get_value::<u32, _>("ProxyEnable").unwrap_or(0),
@@ -126,8 +159,8 @@ mod imp {
             proxy_override: key.get_value::<String, _>("ProxyOverride").ok(),
         };
 
-        let _ = key.set_value("ProxyEnable", &1u32);
-        let _ = key.set_value("ProxyServer", &format!("socks=127.0.0.1:{port}"));
+        let enabled_ok = key.set_value("ProxyEnable", &1u32).is_ok();
+        let server_ok = key.set_value("ProxyServer", &format!("socks=127.0.0.1:{port}")).is_ok();
         // Preserve any existing bypass list; otherwise at least exempt
         // loopback/local traffic from being tunneled through ourselves.
         if previous.proxy_override.is_none() {
@@ -137,6 +170,7 @@ mod imp {
         *saved = Some(previous);
         drop(saved);
         broadcast_settings_changed();
+        enabled_ok && server_ok
     }
 
     pub fn restore() {
@@ -187,6 +221,8 @@ mod imp {
     // Aether-GUI's tray/autostart/notification story is Windows-first (see
     // main.rs), so non-Windows builds simply no-op here rather than
     // implementing the very different per-desktop-environment equivalents.
-    pub fn enable(_port: u16) {}
+    pub fn enable(_port: u16) -> bool {
+        true
+    }
     pub fn restore() {}
 }

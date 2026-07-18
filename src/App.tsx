@@ -19,13 +19,15 @@ const SCREEN_TRANSITION = {
 
 function MainScreen() {
   return (
-    <div className="relative z-10 flex h-full flex-col items-center overflow-y-auto p-6">
-      <div className="flex shrink-0 flex-col items-center justify-center gap-6 py-6">
-        <ConnectButton />
-        <ConnectionStatusLine />
-        <SystemProxyToggle />
+    <div className="relative z-10 flex h-full flex-col overflow-y-auto">
+      <div className="flex min-h-full w-full flex-col items-center justify-center gap-6 p-6">
+        <div className="flex flex-col items-center gap-6">
+          <ConnectButton />
+          <ConnectionStatusLine />
+          <SystemProxyToggle />
+        </div>
+        <AdvancedPanel />
       </div>
-      <AdvancedPanel />
     </div>
   );
 }
