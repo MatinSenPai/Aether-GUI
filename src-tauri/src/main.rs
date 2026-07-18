@@ -7,6 +7,7 @@ mod events;
 mod focus;
 mod settings;
 mod state;
+mod sysproxy;
 mod tray;
 
 use state::AppState;
@@ -95,6 +96,7 @@ fn main() {
         .expect("error building tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::Exit = event {
+                sysproxy::restore_if_active();
                 let state = app_handle.state::<AppState>();
                 let data_dir = app_handle
                     .path()
