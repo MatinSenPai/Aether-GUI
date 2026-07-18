@@ -76,3 +76,20 @@ pub fn set_launch_on_startup(app: AppHandle, enabled: bool) -> Result<(), Aether
     let result = if enabled { autostart.enable() } else { autostart.disable() };
     result.map_err(|e| AetherError::Internal(e.to_string()))
 }
+
+/// Whether the user currently *wants* the Windows system proxy pointed at
+/// Aether-GUI's SOCKS5 port. Independent of `ConnectionState` — see
+/// sysproxy.rs's doc comments — so this can be `true` even while Idle (it's
+/// just a standing preference that takes effect the moment a tunnel comes
+/// up) or `false` while Connected (the tunnel stays up, the OS just isn't
+/// pointed at it).
+#[tauri::command]
+pub fn get_system_proxy_enabled(app: AppHandle) -> bool {
+    settings::load(&app).system_proxy_enabled
+}
+
+#[tauri::command]
+pub fn set_system_proxy_enabled(app: AppHandle, state: State<AppState>, enabled: bool) {
+    let status = state.manager.lock().unwrap().status();
+    crate::sysproxy::set_user_enabled(&app, &status, enabled);
+}

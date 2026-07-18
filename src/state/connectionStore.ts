@@ -19,8 +19,16 @@ interface ConnectionState {
    * lets the UI show real progress instead of an indefinite spinner. Reset
    * on every fresh attempt since it can differ by protocol/scan mode. */
   scanBudgetSecs: number | null;
+  /** Independent of `status` — whether the user currently wants the
+   * Windows system proxy pointed at the tunnel. Mirrors src-tauri's
+   * settings.rs::AppSettings.system_proxy_enabled and can change from
+   * either this window's toggle or the tray's checkbox/Pause item; the
+   * `aether://system-proxy` listener below keeps both in sync. `null`
+   * until the initial value has loaded. */
+  systemProxyEnabled: boolean | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
+  setSystemProxyEnabled: (enabled: boolean) => Promise<void>;
   setProtocol: (protocol: ConnectionProfile["protocol"]) => void;
   setScanMode: (scan_mode: ConnectionProfile["scan_mode"]) => void;
   setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
@@ -43,6 +51,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   logs: [],
   sidecarError: null,
   scanBudgetSecs: null,
+  systemProxyEnabled: null,
 
   connect: async () => {
     try {
@@ -88,6 +97,19 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   setMasqueHttp2: (masque_http2) =>
     set((s) => ({ profile: { ...s.profile, masque_http2 } })),
 
+  setSystemProxyEnabled: async (enabled) => {
+    const previous = get().systemProxyEnabled;
+    set({ systemProxyEnabled: enabled }); // optimistic; the backend also
+    // echoes this back via the aether://system-proxy event, so a tray
+    // toggle fired at the same moment can't leave the two out of sync.
+    try {
+      await invoke("set_system_proxy_enabled", { enabled });
+    } catch (e) {
+      console.error("Failed to update system proxy:", e);
+      set({ systemProxyEnabled: previous });
+    }
+  },
+
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
   // sidecarError if the binary is still missing.
@@ -126,7 +148,7 @@ export async function initConnectionListeners(): Promise<() => void> {
     }));
   };
 
-  const [unlistenStatus, unlistenLog] = await Promise.all([
+  const [unlistenStatus, unlistenLog, unlistenSystemProxy] = await Promise.all([
     listen<ConnectionStatus>("aether://status", (e) => {
       useConnectionStore.setState({
         status: e.payload,
@@ -138,6 +160,13 @@ export async function initConnectionListeners(): Promise<() => void> {
       pendingLogs.push(e.payload);
       flushTimer ??= setTimeout(flushLogs, 100);
     }),
+    // Fired by the Rust side whenever the system-proxy preference changes
+    // from *any* surface (this window's toggle, the tray checkbox, or the
+    // tray's Pause/Resume item) — keeps this window's switch honest even
+    // when the tray is what actually changed it.
+    listen<{ enabled: boolean }>("aether://system-proxy", (e) => {
+      useConnectionStore.setState({ systemProxyEnabled: e.payload.enabled });
+    }),
   ]);
 
   // Reconcile state in case the window reopened mid-session, and load the
@@ -145,11 +174,12 @@ export async function initConnectionListeners(): Promise<() => void> {
   // command touches the Aether binary, so a failure here is an IPC-layer
   // bug, not a sidecar problem — logged rather than shown as sidecarError.
   try {
-    const [status, profile] = await Promise.all([
+    const [status, profile, systemProxyEnabled] = await Promise.all([
       invoke<ConnectionStatus>("get_status"),
       invoke<ConnectionProfile>("get_default_profile"),
+      invoke<boolean>("get_system_proxy_enabled"),
     ]);
-    useConnectionStore.setState({ status, profile });
+    useConnectionStore.setState({ status, profile, systemProxyEnabled });
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }
@@ -157,6 +187,7 @@ export async function initConnectionListeners(): Promise<() => void> {
   return () => {
     unlistenStatus();
     unlistenLog();
+    unlistenSystemProxy();
     if (flushTimer !== null) clearTimeout(flushTimer);
   };
 }

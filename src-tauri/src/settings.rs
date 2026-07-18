@@ -17,11 +17,22 @@ pub struct AppSettings {
     /// using whatever profile `profiles::load` resolves to.
     #[serde(default)]
     pub auto_connect: bool,
+    /// User's *intent* for the Windows system proxy, independent of the
+    /// tunnel's own connection state (see sysproxy.rs). Defaults to `true`
+    /// so behavior out of the box matches the old always-on-while-connected
+    /// wiring; once a user flips this off, it stays off across restarts and
+    /// reconnects until they flip it back on themselves.
+    #[serde(default = "default_true")]
+    pub system_proxy_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
-        Self { start_minimized: false, auto_connect: false }
+        Self { start_minimized: false, auto_connect: false, system_proxy_enabled: true }
     }
 }
 

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConnectionStatusLine } from "@/components/ConnectionStatusLine";
+import { SystemProxyToggle } from "@/components/SystemProxyToggle";
 import { AdvancedPanel } from "@/components/AdvancedPanel";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
@@ -22,6 +23,7 @@ function MainScreen() {
       <div className="flex shrink-0 flex-col items-center justify-center gap-6 py-6">
         <ConnectButton />
         <ConnectionStatusLine />
+        <SystemProxyToggle />
       </div>
       <AdvancedPanel />
     </div>

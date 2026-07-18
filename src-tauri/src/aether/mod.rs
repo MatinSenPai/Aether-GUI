@@ -69,7 +69,7 @@ fn set_state_and_emit(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>, new_
     };
     let _ = app.emit(STATUS_EVENT, &new_state);
     crate::tray::on_state_change(app, &previous_state, &new_state);
-    crate::sysproxy::on_state_change(&previous_state, &new_state);
+    crate::sysproxy::on_state_change(app, &new_state);
 }
 
 /// Kicks off a connection attempt and returns as soon as Aether is spawned
@@ -114,7 +114,7 @@ pub fn start_connect(
     };
     let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);
     crate::tray::on_state_change(&app, &previous_state, &ConnectionState::Launching);
-    crate::sysproxy::on_state_change(&previous_state, &ConnectionState::Launching);
+    crate::sysproxy::on_state_change(&app, &ConnectionState::Launching);
 
     spawn_and_monitor(app, manager, binary, data_dir, profile)
 }
@@ -282,7 +282,7 @@ fn monitor_connect(
                 drop(mgr);
                 let _ = app.emit(STATUS_EVENT, &new_state);
                 crate::tray::on_state_change(&app, &previous_state, &new_state);
-                crate::sysproxy::on_state_change(&previous_state, &new_state);
+                crate::sysproxy::on_state_change(&app, &new_state);
                 announced_connecting = true;
                 continue;
             }
@@ -301,7 +301,7 @@ fn monitor_connect(
             drop(mgr);
             let _ = app.emit(STATUS_EVENT, &new_state);
             crate::tray::on_state_change(&app, &previous_state, &new_state);
-            crate::sysproxy::on_state_change(&previous_state, &new_state);
+            crate::sysproxy::on_state_change(&app, &new_state);
             // Only persisted as "last successful" once actually proven to
             // work, never on a mere attempt (see profiles::save's doc-comment).
             profiles::save(&app, &profile);

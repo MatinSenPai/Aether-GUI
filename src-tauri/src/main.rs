@@ -91,6 +91,8 @@ fn main() {
             commands::set_start_minimized,
             commands::set_auto_connect,
             commands::set_launch_on_startup,
+            commands::get_system_proxy_enabled,
+            commands::set_system_proxy_enabled,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")
