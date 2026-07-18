@@ -61,8 +61,14 @@ fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
 }
 
 fn set_state_and_emit(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>, new_state: ConnectionState) {
-    manager.lock().unwrap().state = new_state.clone();
+    let previous_state = {
+        let mut mgr = manager.lock().unwrap();
+        let previous = mgr.state.clone();
+        mgr.state = new_state.clone();
+        previous
+    };
     let _ = app.emit(STATUS_EVENT, &new_state);
+    crate::tray::on_state_change(app, &previous_state, &new_state);
 }
 
 /// Kicks off a connection attempt and returns as soon as Aether is spawned
@@ -85,7 +91,7 @@ pub fn start_connect(
     let data_dir = app_data_dir(&app);
     std::fs::create_dir_all(&data_dir).map_err(|e| AetherError::Internal(e.to_string()))?;
 
-    {
+    let previous_state = {
         let mut mgr = manager.lock().unwrap();
         if !matches!(mgr.state, ConnectionState::Idle | ConnectionState::Error { .. }) {
             return Err(AetherError::AlreadyRunning);
@@ -98,12 +104,15 @@ pub fn start_connect(
         if status::port_is_live(profile.local_port) {
             return Err(AetherError::PortInUse(profile.local_port));
         }
+        let previous = mgr.state.clone();
         mgr.state = ConnectionState::Launching;
         // A fresh user-initiated connect always gets a full retry budget,
         // independent of whatever happened on a previous, unrelated attempt.
         mgr.retry_count = 0;
-    }
+        previous
+    };
     let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);
+    crate::tray::on_state_change(&app, &previous_state, &ConnectionState::Launching);
 
     spawn_and_monitor(app, manager, binary, data_dir, profile)
 }
@@ -265,10 +274,12 @@ fn monitor_connect(
         if !announced_connecting {
             let done = mgr.session.as_ref().map(|s| s.prompts_done()).unwrap_or(false);
             if done {
+                let previous_state = mgr.state.clone();
                 mgr.state = ConnectionState::Connecting;
                 let new_state = mgr.state.clone();
                 drop(mgr);
                 let _ = app.emit(STATUS_EVENT, &new_state);
+                crate::tray::on_state_change(&app, &previous_state, &new_state);
                 announced_connecting = true;
                 continue;
             }
@@ -279,12 +290,14 @@ fn monitor_connect(
                 socks_addr: format!("127.0.0.1:{}", profile.local_port),
                 connected_at_ms: now_millis(),
             };
+            let previous_state = mgr.state.clone();
             mgr.state = new_state.clone();
             // Proven working — a future drop earns a fresh full retry budget
             // rather than inheriting whatever it took to get here.
             mgr.retry_count = 0;
             drop(mgr);
             let _ = app.emit(STATUS_EVENT, &new_state);
+            crate::tray::on_state_change(&app, &previous_state, &new_state);
             // Only persisted as "last successful" once actually proven to
             // work, never on a mere attempt (see profiles::save's doc-comment).
             profiles::save(&app, &profile);

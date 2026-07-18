@@ -5,18 +5,25 @@ mod commands;
 mod error;
 mod events;
 mod focus;
+mod settings;
 mod state;
+mod tray;
 
 use state::AppState;
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent,
-};
+use tauri::{Manager, WindowEvent};
 
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            // Passed to the binary when Windows/macOS launches it at login,
+            // so `setup` can tell "OS autostart" apart from a manual
+            // double-click even if the user's `start_minimized` setting is
+            // off — autostart launches always start hidden to the tray.
+            Some(vec!["--minimized".into()]),
+        ))
         .manage(AppState::default())
         .setup(|app| {
             let data_dir = app.handle().path().app_data_dir()?;
@@ -29,43 +36,34 @@ fn main() {
 
             // System tray: closing the window hides it instead of quitting
             // (handled in on_window_event below), so the tray is the only
-            // way to fully exit while a tunnel may still be running.
-            let open_item = MenuItem::with_id(app, "open", "Open Aether-GUI", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
-            let tray_menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+            // way to fully exit while a tunnel may still be running. Icon
+            // and tooltip start at "Idle" here and are repainted live from
+            // aether::set_state_and_emit via tray::on_state_change.
+            tray::build(app.handle())?;
 
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("Aether-GUI")
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "quit" => app.exit(0),
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    // Restore the window on a left double-click on the icon.
-                    if let TrayIconEvent::DoubleClick {
-                        button: MouseButton::Left,
-                        ..
-                    } = event
-                    {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
+            // The main window is created hidden (see tauri.conf.json) so an
+            // autostart/minimized launch never flashes it on screen; show it
+            // now unless the user asked to start minimized, or the OS
+            // launched us at login with the --minimized flag.
+            let app_settings = settings::load(app.handle());
+            let launched_minimized = std::env::args().any(|a| a == "--minimized");
+            if !(app_settings.start_minimized || launched_minimized) {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+
+            if app_settings.auto_connect {
+                let app_handle = app.handle().clone();
+                let manager = app.state::<AppState>().manager.clone();
+                // Give orphan-reap and the tray a moment to settle before
+                // spawning Aether, rather than racing app startup.
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                    let _ = aether::start_connect(app_handle, manager, None);
+                });
+            }
 
             Ok(())
         })
@@ -88,6 +86,10 @@ fn main() {
             commands::get_status,
             commands::get_default_profile,
             commands::set_default_profile,
+            commands::get_app_settings,
+            commands::set_start_minimized,
+            commands::set_auto_connect,
+            commands::set_launch_on_startup,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")

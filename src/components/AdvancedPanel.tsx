@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Info, Settings2 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,6 +13,7 @@ import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
 import { useConnectionStore } from "@/state/connectionStore";
+import type { AppSettings } from "@/types/connection";
 
 function FieldRow({
   label,
@@ -64,6 +66,31 @@ export function AdvancedPanel() {
   const locked = status.state !== "Idle" && status.state !== "Error";
   const [autoScroll, setAutoScroll] = useState(true);
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  // Startup/tray settings live in their own Rust-side store (settings.rs) and
+  // the autostart plugin's own OS registration — independent of the
+  // connection profile above, so they're loaded/saved separately here rather
+  // than through connectionStore.
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+
+  useEffect(() => {
+    invoke<AppSettings>("get_app_settings")
+      .then(setAppSettings)
+      .catch((e) => console.error("Failed to load app settings:", e));
+  }, []);
+
+  function updateAppSetting<K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K],
+    command: string,
+  ) {
+    const previous = appSettings;
+    setAppSettings((s) => (s ? { ...s, [key]: value } : s));
+    invoke(command, { enabled: value }).catch((e) => {
+      console.error(`Failed to update ${key}:`, e);
+      setAppSettings(previous); // revert the optimistic toggle on failure
+    });
+  }
 
   useEffect(() => {
     if (autoScroll && viewportRef.current) {
@@ -159,6 +186,79 @@ export function AdvancedPanel() {
                 onCheckedChange={setQuickReconnect}
                 disabled={locked}
                 aria-label="Quick reconnect"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                Startup &amp; Tray
+              </span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                Launch on Windows startup
+                <Tooltip>
+                  <TooltipTrigger aria-label="About Launch on Windows startup">
+                    <Info size={12} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Registers Aether-GUI to start automatically when you log in to Windows. It
+                    launches straight to the tray, the same as "Start minimized to tray" below.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Switch
+                checked={appSettings?.launch_on_startup ?? false}
+                onCheckedChange={(v) =>
+                  updateAppSetting("launch_on_startup", v, "set_launch_on_startup")
+                }
+                disabled={appSettings === null}
+                aria-label="Launch on Windows startup"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                Start minimized to tray
+                <Tooltip>
+                  <TooltipTrigger aria-label="About Start minimized to tray">
+                    <Info size={12} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Keeps the window hidden when Aether-GUI launches — open it again anytime from
+                    the tray icon.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Switch
+                checked={appSettings?.start_minimized ?? false}
+                onCheckedChange={(v) => updateAppSetting("start_minimized", v, "set_start_minimized")}
+                disabled={appSettings === null}
+                aria-label="Start minimized to tray"
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                Auto-connect on launch
+                <Tooltip>
+                  <TooltipTrigger aria-label="About Auto-connect on launch">
+                    <Info size={12} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Starts the tunnel automatically as soon as Aether-GUI launches, using your
+                    last-connected profile.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Switch
+                checked={appSettings?.auto_connect ?? false}
+                onCheckedChange={(v) => updateAppSetting("auto_connect", v, "set_auto_connect")}
+                disabled={appSettings === null}
+                aria-label="Auto-connect on launch"
               />
             </div>
 

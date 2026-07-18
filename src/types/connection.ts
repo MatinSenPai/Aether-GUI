@@ -32,3 +32,10 @@ export interface LogLine {
   line: string;
   timestamp: number;
 }
+
+// Mirrors src-tauri/src/commands.rs::FullAppSettings.
+export interface AppSettings {
+  start_minimized: boolean;
+  auto_connect: boolean;
+  launch_on_startup: boolean;
+}
