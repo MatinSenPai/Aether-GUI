@@ -1,7 +1,7 @@
 # Aether-GUI
 
 [![Release](https://img.shields.io/github/v/release/MatinSenPai/Aether-GUI?sort=semver)](https://github.com/MatinSenPai/Aether-GUI/releases)
-[![License: AGPL v3](https://img.shields.io/github/license/MatinSenPai/Aether-GUI)](LICENSE)
+[![License: GPL v3](https://img.shields.io/github/license/MatinSenPai/Aether-GUI)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
@@ -26,10 +26,12 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
   - **IP Version**: IPv4, IPv6, or both
   - **MASQUE Transport**: HTTP/3 (QUIC — fastest handshake) or HTTP/2 (TCP — looks like ordinary HTTPS, works where UDP is blocked or throttled)
   - **Quick reconnect**: remember the last working gateway and re-test it first, skipping the full scan when it still works
+  - **System-wide TUN**: route all system traffic through the tunnel (requires Administrator, bundles sing-box + wintun)
   
   Each option has an explanation on hover.
 - **Live progress** — while Aether searches for a working route, the GUI shows real elapsed time and, once Aether reports its own scan budget, an actual percentage and progress bar — not just a spinner.
 - **Automatic reconnect** — if the tunnel drops unexpectedly mid-session (observed occasionally with WARP-in-WARP, but handled the same way for every protocol), the GUI retries automatically with backoff, shown as a visible "Reconnecting… (attempt N of 3)" rather than silently dying or dumping you back to a bare error. A user-requested disconnect is never retried.
+- **System-wide TUN mode** — optional toggle that starts a [sing-box](https://github.com/SagerNet/sing-box) TUN interface on top of Aether's SOCKS5 proxy, routing all system traffic through the tunnel without per-app proxy configuration. Requires Administrator privileges.
 
 ## Installing
 
@@ -53,15 +55,34 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
    npm install
    ```
 
-3. **Fetch the Aether binary**
+3. **Fetch the Aether and sing-box binaries**
 
-   Aether-GUI bundles the real `aether` binary from [CluvexStudio/Aether releases](https://github.com/CluvexStudio/Aether/releases) rather than building it — this repo only ships the GUI. Fetch and checksum-verify it for your platform:
+   Aether-GUI bundles two external binaries rather than building them — this repo only ships the GUI.
 
    ```sh
    ./src-tauri/binaries/fetch-aether.sh
+   ./src-tauri/binaries/fetch-singbox.sh
    ```
 
-   This script covers Linux and macOS directly. On Windows, download the matching `aether-windows-*.zip` from the [Aether releases page](https://github.com/CluvexStudio/Aether/releases) yourself, verify it against the published `SHA256SUMS.txt`, and extract `aether.exe` into `src-tauri/binaries/`.
+   `fetch-aether.sh` downloads the Aether binary from [CluvexStudio/Aether releases](https://github.com/CluvexStudio/Aether/releases). On native Windows, use the PowerShell equivalent:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File src-tauri/binaries/fetch-aether.ps1
+   ```
+
+   `fetch-singbox.sh` downloads [sing-box](https://github.com/SagerNet/sing-box) and `wintun.dll` for the TUN mode feature. On native Windows (without Git Bash/MSYS2), use the PowerShell equivalent:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File src-tauri/binaries/fetch-singbox.ps1
+   ```
+
+   Or use the combined npm script:
+
+   ```sh
+   npm run fetch:binaries
+   ```
+
+   All downloaded binaries are gitignored — they are only needed locally for building.
 
 4. **Run in development mode**
 
@@ -80,9 +101,9 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 ## How it works
 
 - **Frontend**: React 19 + Tailwind v4, state managed with Zustand, animated with [Motion](https://motion.dev/) — all talking to the Rust backend over Tauri's IPC. Deliberately lightweight: the ambient background is two compositor-only CSS gradient orbs, and every looping animation freezes while the window is unfocused, so the app costs next to nothing sitting in the background.
-- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real `aether` binary (v1.2.0) in a genuine pseudo-terminal. Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), quick reconnect — is passed as CLI flags/environment up front, so Aether's interactive prompts normally never appear; a background thread still watches the output and can answer any prompt that does, while forwarding every line live to the GUI's log panel.
+- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real `aether` binary (v1.2.0) in a genuine pseudo-terminal. When TUN mode is enabled, a second process ([sing-box](https://github.com/SagerNet/sing-box) v1.13.14) is spawned to create a system-wide TUN interface that routes all traffic through Aether's SOCKS5 proxy. Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), quick reconnect — is passed as CLI flags/environment up front, so Aether's interactive prompts normally never appear; a background thread still watches the output and can answer any prompt that does, while forwarding every line live to the GUI's log panel.
 - **Ground truth for "connected"**: the GUI doesn't trust Aether's log wording alone (that's fragile across releases) — it treats a successful TCP connection to the local SOCKS5 port (`127.0.0.1:1819`) as the actual proof the tunnel is up.
-- **State machine**: `Idle → Launching → Connecting → Connected`, with `Reconnecting` and `Error` as the two ways a connection attempt can end up needing your attention — `Reconnecting` retries automatically (with backoff, capped at 3 attempts), `Error` is the final word once retries are exhausted or something isn't retriable (e.g. the binary itself is missing).
+- **State machine**: `Idle → Launching → Connecting → Connected` (or `Connected → Tunneling` when TUN mode is enabled), with `Reconnecting` and `Error` as the two ways a connection attempt can end up needing your attention — `Reconnecting` retries automatically (with backoff, capped at 3 attempts), `Error` is the final word once retries are exhausted or something isn't retriable (e.g. the binary itself is missing).
 
 ## About Aether
 
@@ -90,4 +111,4 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 
 ## License
 
-[GNU Affero General Public License v3.0](LICENSE).
+[GNU General Public License v3.0](LICENSE).

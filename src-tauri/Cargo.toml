@@ -6,6 +6,7 @@ edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+embed-resource = "3"
 
 [dependencies]
 tauri = { version = "2", features = [] }
@@ -16,4 +17,4 @@ portable-pty = "0.8"
 thiserror = "1"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }

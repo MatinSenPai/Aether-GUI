@@ -84,6 +84,9 @@ pub struct ConnectionProfile {
     /// new interactive "MASQUE transport" prompt in both directions.
     #[serde(default)]
     pub masque_http2: bool,
+    /// Persist the user's TUN toggle across app restarts.
+    #[serde(default)]
+    pub tun_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -130,6 +133,7 @@ impl Default for ConnectionProfile {
             ip_version: IpVersion::V4,
             quick_reconnect: true,
             masque_http2: false,
+            tun_enabled: false,
         }
     }
 }

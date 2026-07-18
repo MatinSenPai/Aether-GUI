@@ -6,6 +6,7 @@ pub mod status;
 
 use crate::error::AetherError;
 use crate::events::{now_millis, LogEvent, LOG_EVENT, STATUS_EVENT};
+use crate::singbox;
 use crate::state::ConnectionState;
 use profiles::ConnectionProfile;
 use pty::PtySession;
@@ -19,6 +20,7 @@ pub struct AetherManager {
     session: Option<PtySession>,
     state: ConnectionState,
     user_requested_stop: bool,
+    enable_tun: bool,
     /// Consecutive auto-retry attempts for the current connection lineage.
     /// Reset to 0 on a fresh user-initiated connect, on reaching Connected
     /// (a proven-working connection earns a full retry budget for whatever
@@ -32,6 +34,7 @@ impl AetherManager {
             session: None,
             state: ConnectionState::Idle,
             user_requested_stop: false,
+            enable_tun: false,
             retry_count: 0,
         }
     }
@@ -74,13 +77,16 @@ pub fn start_connect(
     app: AppHandle,
     manager: Arc<Mutex<AetherManager>>,
     profile_override: Option<ConnectionProfile>,
+    enable_tun: bool,
+    singbox: Arc<Mutex<singbox::SingboxManager>>,
 ) -> Result<(), AetherError> {
     // Resolve everything fallible that doesn't touch AetherManager's state
     // first, so that once we transition to Launching below, the only
     // remaining failure mode is pty::spawn itself — which is handled
     // explicitly inside spawn_and_monitor rather than ever leaving the
     // state machine stuck in Launching with no process behind it.
-    let profile = profile_override.unwrap_or_else(|| profiles::load(&app));
+    let mut profile = profile_override.unwrap_or_else(|| profiles::load(&app));
+    profile.tun_enabled = enable_tun;
     let binary = resolve_binary(&app)?;
     let data_dir = app_data_dir(&app);
     std::fs::create_dir_all(&data_dir).map_err(|e| AetherError::Internal(e.to_string()))?;
@@ -99,13 +105,14 @@ pub fn start_connect(
             return Err(AetherError::PortInUse(status::SOCKS_PORT));
         }
         mgr.state = ConnectionState::Launching;
+        mgr.enable_tun = enable_tun;
         // A fresh user-initiated connect always gets a full retry budget,
         // independent of whatever happened on a previous, unrelated attempt.
         mgr.retry_count = 0;
     }
     let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);
 
-    spawn_and_monitor(app, manager, binary, data_dir, profile)
+    spawn_and_monitor(app, manager, binary, data_dir, profile, singbox)
 }
 
 /// Spawns the PTY session and the log-forwarding + monitor threads. Shared
@@ -118,6 +125,7 @@ fn spawn_and_monitor(
     binary: PathBuf,
     data_dir: PathBuf,
     profile: ConnectionProfile,
+    singbox: Arc<Mutex<singbox::SingboxManager>>,
 ) -> Result<(), AetherError> {
     let (log_tx, log_rx) = mpsc::channel::<LogEvent>();
     let session_or_err = pty::spawn(&binary, &data_dir, profile.clone(), log_tx);
@@ -160,7 +168,7 @@ fn spawn_and_monitor(
         let manager = Arc::clone(&manager);
         let binary = binary.clone();
         let data_dir = data_dir.clone();
-        std::thread::spawn(move || monitor_connect(app, manager, binary, data_dir, profile));
+        std::thread::spawn(move || monitor_connect(app, manager, binary, data_dir, profile, singbox));
     }
 
     Ok(())
@@ -182,6 +190,7 @@ fn handle_unexpected_failure(
     profile: ConnectionProfile,
     failure_message: String,
     phase: &'static str,
+    singbox: Arc<Mutex<singbox::SingboxManager>>,
 ) {
     let attempt = {
         let mut mgr = manager.lock().unwrap();
@@ -226,7 +235,7 @@ fn handle_unexpected_failure(
         set_state_and_emit(&app, &manager, ConnectionState::Launching);
         // spawn_and_monitor already lands its own failure in Error/retry —
         // nothing further to do with its Result here.
-        let _ = spawn_and_monitor(app, manager, binary, data_dir, profile);
+        let _ = spawn_and_monitor(app, manager, binary, data_dir, profile, singbox);
     });
 }
 
@@ -236,6 +245,7 @@ fn monitor_connect(
     binary: PathBuf,
     data_dir: PathBuf,
     profile: ConnectionProfile,
+    singbox: Arc<Mutex<singbox::SingboxManager>>,
 ) {
     let deadline = Instant::now() + status::CONNECT_TIMEOUT;
     let mut announced_connecting = false;
@@ -258,6 +268,7 @@ fn monitor_connect(
                 profile,
                 format!("Aether exited before connecting ({exit})"),
                 "connecting",
+                singbox,
             );
             return;
         }
@@ -275,9 +286,52 @@ fn monitor_connect(
         }
 
         if status::port_is_live() {
+            let socks_addr = format!("127.0.0.1:{}", status::SOCKS_PORT);
+            let connected_at_ms = now_millis();
+            let enable_tun = mgr.enable_tun;
+
+            // If TUN is requested, start sing-box and transition to Tunneling.
+            if enable_tun {
+                // Release the Aether manager lock before acquiring the singbox lock.
+                let new_state = ConnectionState::Connected {
+                    socks_addr: socks_addr.clone(),
+                    connected_at_ms,
+                };
+                mgr.state = new_state.clone();
+                mgr.retry_count = 0;
+                drop(mgr);
+                let _ = app.emit(STATUS_EVENT, &new_state);
+                profiles::save(&app, &profile);
+
+                // Start sing-box TUN tunnel.
+                // Reap any orphaned sing-box first (e.g. from a previous crash
+                // or manual kill that left the TUN adapter lingering).
+                singbox::reap_orphan(&data_dir);
+                match singbox::start_tunnel(app.clone(), singbox.clone(), status::SOCKS_PORT) {
+                    Ok(()) => {
+                        // Tunneling state will be emitted by start_tunnel's monitor thread.
+                        // Now monitor the Aether connection for drops.
+                        monitor_connected(app, manager, binary, data_dir, profile, singbox);
+                    }
+                    Err(e) => {
+                        // sing-box failed to start — Aether is still connected, so report
+                        // the tunnel error but keep Aether running.
+                        let _ = app.emit(
+                            STATUS_EVENT,
+                            &ConnectionState::Error {
+                                message: format!("Tunnel failed: {e}"),
+                                phase: "tunnel".into(),
+                            },
+                        );
+                    }
+                }
+                return;
+            }
+
+            // No TUN — just normal Connected state.
             let new_state = ConnectionState::Connected {
-                socks_addr: format!("127.0.0.1:{}", status::SOCKS_PORT),
-                connected_at_ms: now_millis(),
+                socks_addr,
+                connected_at_ms,
             };
             mgr.state = new_state.clone();
             // Proven working — a future drop earns a fresh full retry budget
@@ -288,7 +342,7 @@ fn monitor_connect(
             // Only persisted as "last successful" once actually proven to
             // work, never on a mere attempt (see profiles::save's doc-comment).
             profiles::save(&app, &profile);
-            monitor_connected(app, manager, binary, data_dir, profile);
+            monitor_connected(app, manager, binary, data_dir, profile, singbox);
             return;
         }
 
@@ -306,6 +360,7 @@ fn monitor_connect(
                 profile,
                 "Timed out waiting for Aether to find a working route".into(),
                 "connecting",
+                singbox,
             );
             return;
         }
@@ -320,6 +375,7 @@ fn monitor_connected(
     binary: PathBuf,
     data_dir: PathBuf,
     profile: ConnectionProfile,
+    singbox: Arc<Mutex<singbox::SingboxManager>>,
 ) {
     loop {
         std::thread::sleep(Duration::from_millis(500));
@@ -330,6 +386,8 @@ fn monitor_connected(
         if let Some(exit) = mgr.session.as_mut().and_then(|s| s.try_wait()) {
             mgr.session = None;
             drop(mgr);
+            // Stop sing-box if it was running.
+            singbox::stop_tunnel(&app, &singbox);
             handle_unexpected_failure(
                 app,
                 manager,
@@ -338,13 +396,17 @@ fn monitor_connected(
                 profile,
                 format!("Lost connection unexpectedly ({exit})"),
                 "connected",
+                singbox,
             );
             return;
         }
     }
 }
 
-pub fn request_disconnect(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>) -> Result<(), AetherError> {
+pub fn request_disconnect(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>, singbox: &Arc<Mutex<singbox::SingboxManager>>) -> Result<(), AetherError> {
+    // Stop sing-box first if it's running.
+    singbox::stop_tunnel(app, singbox);
+
     let had_session = {
         let mut mgr = manager.lock().unwrap();
         // Reconnecting has no live session (the old one already exited; the
@@ -402,7 +464,20 @@ pub fn request_disconnect(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>) 
 /// Called from `RunEvent::Exit` — the app is quitting regardless, so this
 /// blocks briefly rather than spawning a thread, and skips emitting events
 /// nobody is left to receive.
-pub fn shutdown_blocking(manager: &Arc<Mutex<AetherManager>>, data_dir: &Path) {
+pub fn shutdown_blocking(manager: &Arc<Mutex<AetherManager>>, singbox: &Arc<Mutex<singbox::SingboxManager>>, data_dir: &Path) {
+    // Stop sing-box first.
+    {
+        let mut sb = singbox.lock().unwrap();
+        if let Some(proc) = sb.process.as_mut() {
+            proc.kill();
+        }
+        sb.process = None;
+        sb.active = false;
+        sb.config_path = None;
+    }
+    let _ = std::fs::remove_file(data_dir.join("singbox.pid"));
+
+    // Then stop Aether.
     let mut mgr = manager.lock().unwrap();
     if let Some(session) = mgr.session.as_mut() {
         session.send_ctrl_c();

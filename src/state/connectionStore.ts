@@ -12,6 +12,7 @@ const MAX_LOG_LINES = 500;
 interface ConnectionState {
   status: ConnectionStatus;
   profile: ConnectionProfile;
+  tunEnabled: boolean;
   logs: LogLine[];
   sidecarError: string | null;
   /** Aether's own route-probe budget in seconds, parsed live out of its log
@@ -26,6 +27,7 @@ interface ConnectionState {
   setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
   setQuickReconnect: (quick_reconnect: boolean) => void;
   setMasqueHttp2: (masque_http2: boolean) => void;
+  setTunEnabled: (enabled: boolean) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -37,14 +39,19 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     ip_version: "v4",
     quick_reconnect: true,
     masque_http2: false,
+    tun_enabled: false,
   },
+  tunEnabled: false,
   logs: [],
   sidecarError: null,
   scanBudgetSecs: null,
 
   connect: async () => {
     try {
-      await invoke("connect", { profileOverride: get().profile });
+      await invoke("connect", {
+        profileOverride: get().profile,
+        enableTun: get().tunEnabled,
+      });
     } catch (e) {
       const message = String(e);
       // "Binary not found" (src-tauri/src/aether/mod.rs::resolve_binary) means
@@ -82,6 +89,8 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setMasqueHttp2: (masque_http2) =>
     set((s) => ({ profile: { ...s.profile, masque_http2 } })),
+
+  setTunEnabled: (tunEnabled) => set({ tunEnabled }),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
@@ -144,7 +153,7 @@ export async function initConnectionListeners(): Promise<() => void> {
       invoke<ConnectionStatus>("get_status"),
       invoke<ConnectionProfile>("get_default_profile"),
     ]);
-    useConnectionStore.setState({ status, profile });
+    useConnectionStore.setState({ status, profile, tunEnabled: profile.tun_enabled });
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }

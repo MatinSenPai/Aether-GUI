@@ -11,6 +11,7 @@ import { ProtocolSelect } from "@/components/ProtocolSelect";
 import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
+import { TunToggle } from "@/components/TunToggle";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -103,6 +104,8 @@ export function AdvancedPanel() {
             >
               <MasqueTransportToggle />
             </FieldRow>
+
+            <TunToggle />
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">

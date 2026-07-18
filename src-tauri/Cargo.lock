@@ -12,6 +12,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 name = "aether-gui"
 version = "0.4.0"
 dependencies = [
+ "embed-resource",
  "portable-pty",
  "serde",
  "serde_json",

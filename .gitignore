@@ -4,11 +4,11 @@ dist-ssr/
 *.local
 src-tauri/target/
 src-tauri/gen/
-src-tauri/binaries/aether
-src-tauri/binaries/aether.exe
-src-tauri/binaries/*.tar.gz
-src-tauri/binaries/*.zip
-src-tauri/binaries/SHA256SUMS.txt
+src-tauri/binaries/*
+!src-tauri/binaries/fetch-aether.sh
+!src-tauri/binaries/fetch-aether.ps1
+!src-tauri/binaries/fetch-singbox.sh
+!src-tauri/binaries/fetch-singbox.ps1
 # Aether writes its provisioned device identity (private keys, access
 # tokens) here when run with binaries/ as its cwd (e.g. manual testing) —
 # must never be committed.
