@@ -1,10 +1,8 @@
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
-pub const SOCKS_PORT: u16 = 1819;
-
-pub fn socks_addr() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], SOCKS_PORT))
+pub fn socks_addr(port: u16) -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], port))
 }
 
 /// Ground-truth "are we connected" signal: try to open a TCP connection to
@@ -12,8 +10,8 @@ pub fn socks_addr() -> SocketAddr {
 /// wording across releases, which is the actual fragility PTY-automation
 /// accepts (see the approved plan) — log-line matching is only ever used to
 /// fail fast / show a nicer message, never as the sole source of truth.
-pub fn port_is_live() -> bool {
-    TcpStream::connect_timeout(&socks_addr(), Duration::from_millis(300)).is_ok()
+pub fn port_is_live(port: u16) -> bool {
+    TcpStream::connect_timeout(&socks_addr(port), Duration::from_millis(300)).is_ok()
 }
 
 /// Empirically (manually running v1.0.1 to completion), Aether's own route-

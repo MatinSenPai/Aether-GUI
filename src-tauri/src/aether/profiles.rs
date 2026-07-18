@@ -62,16 +62,21 @@ impl IpVersion {
     }
 }
 
-/// Note: there is no `local_port` or `obfuscation_profile` field. Manually
-/// running Aether v1.0.1 end to end showed it only ever prompts for these
-/// three settings (protocol / scan mode / IP version) regardless of protocol
-/// choice — the local port is fixed at 1819 by Aether itself, and the
-/// obfuscation profile is auto-selected and merely logged, never prompted.
+/// Note: there is no `obfuscation_profile` field — it is auto-selected and
+/// merely logged, never prompted. `local_port` IS user-configurable: Aether
+/// accepts `--bind <ip:port>` (see cli.rs upstream), it just isn't one of
+/// the three interactive prompts (protocol / scan mode / IP version) that
+/// appear when it's left unset.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub protocol: Protocol,
     pub scan_mode: ScanMode,
     pub ip_version: IpVersion,
+    /// Local SOCKS5 listen port, passed as `--bind 127.0.0.1:<port>`.
+    /// `serde(default)` keeps profiles saved before this field existed
+    /// loading cleanly, falling back to Aether's own default of 1819.
+    #[serde(default = "default_local_port")]
+    pub local_port: u16,
     /// Aether ≥1.1.1: reuse the last known-working gateway with a quick
     /// recheck instead of a full scan. `serde(default)` keeps profiles saved
     /// by older versions of this app loading cleanly.
@@ -90,6 +95,10 @@ fn default_true() -> bool {
     true
 }
 
+fn default_local_port() -> u16 {
+    1819
+}
+
 impl ConnectionProfile {
     /// CLI flags for Aether ≥1.1.1 — the whole profile is passed up front so
     /// the interactive prompts never appear (the PTY prompt-answering in
@@ -97,26 +106,41 @@ impl ConnectionProfile {
     /// ALWAYS passed: without either, 1.1.1 asks its own interactive
     /// "reconnect with last gateway?" question, which the GUI must never
     /// leave unanswered.
-    pub fn as_args(&self) -> Vec<&'static str> {
-        let mut args = Vec::with_capacity(4);
+    pub fn as_args(&self) -> Vec<String> {
+        let mut args: Vec<String> = Vec::with_capacity(6);
         match self.protocol {
             Protocol::Auto => {} // Aether's own default (MASQUE)
-            Protocol::Masque => args.push("--masque"),
-            Protocol::Wireguard => args.push("--wg"),
-            Protocol::Gool => args.push("--gool"),
+            Protocol::Masque => args.push("--masque".into()),
+            Protocol::Wireguard => args.push("--wg".into()),
+            Protocol::Gool => args.push("--gool".into()),
         }
-        args.push(match self.scan_mode {
-            ScanMode::Turbo => "--turbo",
-            ScanMode::Balanced => "--balanced",
-            ScanMode::Thorough => "--thorough",
-            ScanMode::Stealth => "--stealth",
-        });
-        args.push(match self.ip_version {
-            IpVersion::V4 => "-4",
-            IpVersion::V6 => "-6",
-            IpVersion::Both => "--dual",
-        });
-        args.push(if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" });
+        args.push(
+            match self.scan_mode {
+                ScanMode::Turbo => "--turbo",
+                ScanMode::Balanced => "--balanced",
+                ScanMode::Thorough => "--thorough",
+                ScanMode::Stealth => "--stealth",
+            }
+            .into(),
+        );
+        args.push(
+            match self.ip_version {
+                IpVersion::V4 => "-4",
+                IpVersion::V6 => "-6",
+                IpVersion::Both => "--dual",
+            }
+            .into(),
+        );
+        args.push(
+            if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" }.into(),
+        );
+        // Only pass --bind when it differs from Aether's own default, so a
+        // stock profile's spawned command line stays identical to before
+        // this field existed.
+        if self.local_port != default_local_port() {
+            args.push("--bind".into());
+            args.push(format!("127.0.0.1:{}", self.local_port));
+        }
         args
     }
 }
@@ -128,6 +152,7 @@ impl Default for ConnectionProfile {
             protocol: Protocol::Auto,
             scan_mode: ScanMode::Balanced,
             ip_version: IpVersion::V4,
+            local_port: default_local_port(),
             quick_reconnect: true,
             masque_http2: false,
         }

@@ -56,6 +56,9 @@ export function AdvancedPanel() {
   const status = useConnectionStore((s) => s.status);
   const quickReconnect = useConnectionStore((s) => s.profile.quick_reconnect);
   const setQuickReconnect = useConnectionStore((s) => s.setQuickReconnect);
+  const localPort = useConnectionStore((s) => s.profile.local_port);
+  const setLocalPort = useConnectionStore((s) => s.setLocalPort);
+  const [portDraft, setPortDraft] = useState(String(localPort));
   const [open, setOpen] = useState(false);
   // Launch flag — locked mid-session like the other profile controls.
   const locked = status.state !== "Idle" && status.state !== "Error";
@@ -67,6 +70,19 @@ export function AdvancedPanel() {
       viewportRef.current.scrollTop = viewportRef.current.scrollHeight;
     }
   }, [logs, autoScroll]);
+
+  useEffect(() => {
+    setPortDraft(String(localPort));
+  }, [localPort]);
+
+  function commitPortDraft() {
+    const parsed = Number(portDraft);
+    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+      setLocalPort(parsed);
+    } else {
+      setPortDraft(String(localPort)); // invalid entry: revert to last valid value
+    }
+  }
 
   return (
     <div className="w-full max-w-sm">
@@ -102,6 +118,26 @@ export function AdvancedPanel() {
               tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
             >
               <MasqueTransportToggle />
+            </FieldRow>
+
+            <FieldRow
+              label="Local Port"
+              tooltip="The local SOCKS5 port Aether listens on (127.0.0.1). Change this if 1819 is already used by another app."
+            >
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                value={portDraft}
+                disabled={locked}
+                onChange={(e) => setPortDraft(e.target.value)}
+                onBlur={commitPortDraft}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                aria-label="Local SOCKS5 port"
+                className="w-24 rounded-md bg-surface-2 px-2 py-1 text-xs text-foreground ring-1 ring-white/10 outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+              />
             </FieldRow>
 
             <div className="flex items-center justify-between">

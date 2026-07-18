@@ -95,8 +95,8 @@ pub fn start_connect(
         // checked under the same lock as the state check above so a rapid
         // double-click can't race two connect() calls past this guard before
         // the first transitions to Launching.
-        if status::port_is_live() {
-            return Err(AetherError::PortInUse(status::SOCKS_PORT));
+        if status::port_is_live(profile.local_port) {
+            return Err(AetherError::PortInUse(profile.local_port));
         }
         mgr.state = ConnectionState::Launching;
         // A fresh user-initiated connect always gets a full retry budget,
@@ -274,9 +274,9 @@ fn monitor_connect(
             }
         }
 
-        if status::port_is_live() {
+        if status::port_is_live(profile.local_port) {
             let new_state = ConnectionState::Connected {
-                socks_addr: format!("127.0.0.1:{}", status::SOCKS_PORT),
+                socks_addr: format!("127.0.0.1:{}", profile.local_port),
                 connected_at_ms: now_millis(),
             };
             mgr.state = new_state.clone();

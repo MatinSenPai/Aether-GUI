@@ -18,6 +18,8 @@ export interface ConnectionProfile {
   protocol: Protocol;
   scan_mode: ScanMode;
   ip_version: IpVersion;
+  /** Local SOCKS5 listen port. Defaults to Aether's own default, 1819. */
+  local_port: number;
   /** Aether ≥1.1.1: reuse the last known-working gateway with a quick
    * recheck instead of a full scan. */
   quick_reconnect: boolean;

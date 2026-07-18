@@ -24,6 +24,7 @@ interface ConnectionState {
   setProtocol: (protocol: ConnectionProfile["protocol"]) => void;
   setScanMode: (scan_mode: ConnectionProfile["scan_mode"]) => void;
   setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
+  setLocalPort: (local_port: number) => void;
   setQuickReconnect: (quick_reconnect: boolean) => void;
   setMasqueHttp2: (masque_http2: boolean) => void;
   retryAfterSidecarError: () => void;
@@ -35,6 +36,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     protocol: "auto",
     scan_mode: "balanced",
     ip_version: "v4",
+    local_port: 1819,
     quick_reconnect: true,
     masque_http2: false,
   },
@@ -76,6 +78,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setIpVersion: (ip_version) =>
     set((s) => ({ profile: { ...s.profile, ip_version } })),
+
+  setLocalPort: (local_port) =>
+    set((s) => ({ profile: { ...s.profile, local_port } })),
 
   setQuickReconnect: (quick_reconnect) =>
     set((s) => ({ profile: { ...s.profile, quick_reconnect } })),
