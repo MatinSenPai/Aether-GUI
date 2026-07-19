@@ -24,6 +24,17 @@ pub struct AppSettings {
     /// reconnects until they flip it back on themselves.
     #[serde(default = "default_true")]
     pub system_proxy_enabled: bool,
+    /// UI/tray/notification language — "en" or "fa". Read once at startup
+    /// by `i18n::init` into the in-memory `i18n::CURRENT` atomic (tray menu
+    /// labels and OS notifications are built in Rust, not the webview, so
+    /// they need their own copy rather than reading the frontend's state);
+    /// changed later via the `set_language` command, which updates both.
+    #[serde(default = "default_language")]
+    pub language: String,
+}
+
+fn default_language() -> String {
+    "en".to_string()
 }
 
 fn default_true() -> bool {
@@ -32,7 +43,12 @@ fn default_true() -> bool {
 
 impl Default for AppSettings {
     fn default() -> Self {
-        Self { start_minimized: false, auto_connect: false, system_proxy_enabled: true }
+        Self {
+            start_minimized: false,
+            auto_connect: false,
+            system_proxy_enabled: true,
+            language: default_language(),
+        }
     }
 }
 

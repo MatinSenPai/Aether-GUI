@@ -43,6 +43,7 @@ pub struct FullAppSettings {
     pub start_minimized: bool,
     pub auto_connect: bool,
     pub launch_on_startup: bool,
+    pub language: String,
 }
 
 #[tauri::command]
@@ -53,6 +54,7 @@ pub fn get_app_settings(app: AppHandle) -> FullAppSettings {
         start_minimized: stored.start_minimized,
         auto_connect: stored.auto_connect,
         launch_on_startup,
+        language: stored.language,
     }
 }
 
@@ -75,6 +77,20 @@ pub fn set_launch_on_startup(app: AppHandle, enabled: bool) -> Result<(), Aether
     let autostart = app.autolaunch();
     let result = if enabled { autostart.enable() } else { autostart.disable() };
     result.map_err(|e| AetherError::Internal(e.to_string()))
+}
+
+/// Switches the tray/notification language immediately (via
+/// `i18n::set` + `tray::retranslate`) and persists the choice so the next
+/// launch starts in it — the frontend keeps its own separate copy of the
+/// choice (and its own dictionary) for the webview UI, synced by whichever
+/// surface the user changed it from.
+#[tauri::command]
+pub fn set_language(app: AppHandle, lang: String) {
+    let mut stored = settings::load(&app);
+    stored.language = lang.clone();
+    settings::save(&app, &stored);
+    crate::i18n::set(crate::i18n::Lang::from_code(&lang));
+    crate::tray::retranslate(&app);
 }
 
 /// Whether the user currently *wants* the Windows system proxy pointed at

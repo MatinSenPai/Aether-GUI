@@ -38,4 +38,5 @@ export interface AppSettings {
   start_minimized: boolean;
   auto_connect: boolean;
   launch_on_startup: boolean;
+  language: string;
 }

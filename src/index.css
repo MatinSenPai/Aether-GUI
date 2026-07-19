@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/vazirmatn";
 
 @theme inline {
     --font-heading: var(--font-sans);
@@ -100,6 +101,56 @@
     --status-idle: #6b7280;
 }
 
+/* --- Alternate color themes ---------------------------------------------
+   Only the brand/accent colors vary between themes (primary, its ring, and
+   the "connecting" status pulse that's always tied to the brand color) —
+   the semantic status colors (connected=teal, error=red, idle=gray) stay
+   fixed across all themes since they carry meaning independent of brand,
+   the same reasoning as the surface/elevation scale above. Selected by
+   setting `data-theme` on <html> (see src/theme/ThemeContext.tsx); "aether"
+   is the default and matches the :root block above, so it has no override
+   block of its own. Adding a new theme is just one more block here plus one
+   entry in src/theme/themes.ts — nothing else needs to change. */
+html[data-theme="teal"] {
+  --primary: #14b8a6;
+  --primary-foreground: #0d0d0f;
+  --ring: #14b8a6;
+  --sidebar-primary: #14b8a6;
+  --sidebar-primary-foreground: #0d0d0f;
+  --sidebar-ring: #14b8a6;
+  --status-connecting: #14b8a6;
+}
+html[data-theme="violet"] {
+  --primary: #8b5cf6;
+  --primary-foreground: #0d0d0f;
+  --ring: #8b5cf6;
+  --sidebar-primary: #8b5cf6;
+  --sidebar-primary-foreground: #0d0d0f;
+  --sidebar-ring: #8b5cf6;
+  --status-connecting: #8b5cf6;
+}
+html[data-theme="crimson"] {
+  --primary: #e11d48;
+  --primary-foreground: #f2f2f2;
+  --ring: #e11d48;
+  --sidebar-primary: #e11d48;
+  --sidebar-primary-foreground: #f2f2f2;
+  --sidebar-ring: #e11d48;
+  --status-connecting: #e11d48;
+}
+
+/* --- Language-specific overrides -----------------------------------------
+   Persian gets Vazirmatn instead of Inter (no Arabic-script glyphs in Inter
+   at all) — specificity here (element + attribute) intentionally beats
+   `:root`'s so no `!important` is needed. Layout direction itself is set on
+   the `dir` attribute, not here (see LanguageContext.tsx) — the app's own
+   components are flex/gap-based rather than physical ml-/mr- utilities, so
+   `dir="rtl"` alone mirrors them correctly. */
+html[lang="fa"] {
+  --font-sans: 'Vazirmatn Variable', 'Inter Variable', system-ui, sans-serif;
+}
+
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -168,4 +219,3 @@
 @media (prefers-reduced-motion: reduce) {
   .anim-ring-breathe, .anim-orb-a, .anim-orb-b { animation: none; }
 }
-

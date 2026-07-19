@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useConnectionStore } from "@/state/connectionStore";
 import { useWindowFocused } from "@/state/windowFocus";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 const TEXT_TRANSITION = {
   initial: { y: 4, opacity: 0 },
@@ -66,6 +67,7 @@ function ScanProgressBar({ percent }: { percent: number | null }) {
 export function ConnectionStatusLine() {
   const status = useConnectionStore((s) => s.status);
   const scanBudgetSecs = useConnectionStore((s) => s.scanBudgetSecs);
+  const { t } = useLanguage();
   const connectedAt = status.state === "Connected" ? status.connected_at_ms : null;
   const elapsed = useElapsed(connectedAt).formatted;
 
@@ -102,35 +104,35 @@ export function ConnectionStatusLine() {
 
   switch (status.state) {
     case "Idle":
-      primary = "Disconnected";
-      secondary = "Click to connect";
+      primary = t.status.idlePrimary;
+      secondary = t.status.idleSecondary;
       break;
     case "Launching":
-      primary = "Starting Aether…";
-      secondary = "Answering setup prompts";
+      primary = t.status.launchingPrimary;
+      secondary = t.status.launchingSecondary;
       break;
     case "Connecting":
-      primary = "Finding a route…";
+      primary = t.status.connectingPrimary;
       secondary =
         scanPercent != null
-          ? `Still searching · ${attemptElapsed} · ${scanPercent}%`
-          : `Still searching · ${attemptElapsed}`;
+          ? `${t.status.stillSearching} · ${attemptElapsed} · ${scanPercent}%`
+          : `${t.status.stillSearching} · ${attemptElapsed}`;
       break;
     case "Reconnecting":
-      primary = "Reconnecting…";
-      secondary = `Attempt ${status.attempt} of ${status.max_attempts}`;
+      primary = t.status.reconnectingPrimary;
+      secondary = t.status.attemptOf(status.attempt, status.max_attempts);
       break;
     case "Connected":
-      primary = "Connected";
+      primary = t.status.connectedPrimary;
       secondary = elapsed;
       tertiary = status.profile_summary;
       break;
     case "Disconnecting":
-      primary = "Disconnecting…";
+      primary = t.status.disconnectingPrimary;
       secondary = "";
       break;
     case "Error":
-      primary = "Connection failed";
+      primary = t.status.errorPrimary;
       secondary = status.message;
       break;
   }

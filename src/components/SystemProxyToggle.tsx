@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConnectionStore } from "@/state/connectionStore";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 /**
  * Independent of the Connect button on purpose: this is the user's standing
@@ -15,27 +16,24 @@ import { useConnectionStore } from "@/state/connectionStore";
 export function SystemProxyToggle() {
   const enabled = useConnectionStore((s) => s.systemProxyEnabled);
   const setEnabled = useConnectionStore((s) => s.setSystemProxyEnabled);
+  const { t } = useLanguage();
 
   return (
     <div className="flex items-center gap-2 rounded-full bg-surface-2/60 px-3 py-1.5 ring-1 ring-white/10">
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        System Proxy
+        {t.systemProxy.label}
         <Tooltip>
-          <TooltipTrigger aria-label="About System Proxy">
+          <TooltipTrigger aria-label={t.advanced.about(t.systemProxy.label)}>
             <Info size={12} />
           </TooltipTrigger>
-          <TooltipContent>
-            Routes Windows' system-wide proxy through the tunnel whenever it's up. Turn this off
-            to keep the tunnel connected without changing your system proxy — useful if you only
-            want specific apps to use it.
-          </TooltipContent>
+          <TooltipContent>{t.systemProxy.tooltip}</TooltipContent>
         </Tooltip>
       </span>
       <Switch
         checked={enabled ?? false}
         disabled={enabled === null}
         onCheckedChange={(v) => void setEnabled(v)}
-        aria-label="System Proxy"
+        aria-label={t.systemProxy.label}
       />
     </div>
   );

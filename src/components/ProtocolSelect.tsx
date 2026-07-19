@@ -6,14 +6,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useConnectionStore } from "@/state/connectionStore";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { Protocol } from "@/types/connection";
-
-const LABELS: Record<Protocol, string> = {
-  auto: "Auto (recommended)",
-  masque: "MASQUE",
-  wireguard: "WireGuard",
-  gool: "WARP-in-WARP (gool)",
-};
 
 /**
  * Defaults to "Auto" rather than a bare protocol choice: Aether's own
@@ -27,8 +21,15 @@ export function ProtocolSelect() {
   const status = useConnectionStore((s) => s.status);
   const protocol = useConnectionStore((s) => s.profile.protocol);
   const setProtocol = useConnectionStore((s) => s.setProtocol);
+  const { t } = useLanguage();
 
   const locked = status.state !== "Idle" && status.state !== "Error";
+  const labels: Record<Protocol, string> = {
+    auto: t.protocol.auto,
+    masque: t.protocol.masque,
+    wireguard: t.protocol.wireguard,
+    gool: t.protocol.gool,
+  };
 
   return (
     <Select
@@ -39,14 +40,14 @@ export function ProtocolSelect() {
       <SelectTrigger
         size="sm"
         className="w-full border-transparent bg-transparent text-muted-foreground shadow-none hover:bg-surface-2"
-        aria-label="Protocol"
+        aria-label={t.advanced.protocol}
       >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {(Object.keys(LABELS) as Protocol[]).map((p) => (
+        {(Object.keys(labels) as Protocol[]).map((p) => (
           <SelectItem key={p} value={p}>
-            {LABELS[p]}
+            {labels[p]}
           </SelectItem>
         ))}
       </SelectContent>

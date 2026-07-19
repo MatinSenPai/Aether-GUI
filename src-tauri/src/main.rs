@@ -5,6 +5,7 @@ mod commands;
 mod error;
 mod events;
 mod focus;
+mod i18n;
 mod settings;
 mod state;
 mod sysproxy;
@@ -34,6 +35,12 @@ fn main() {
             // same port.
             aether::orphan::reap_orphan(&data_dir);
             focus::spawn_watcher(app.handle().clone());
+
+            // Load the persisted UI language into the in-memory i18n state
+            // before the tray is built, so its very first frame (menu
+            // labels, tooltip) is already in the right language instead of
+            // flashing English and then retranslating a moment later.
+            i18n::init(app.handle());
 
             // System tray: closing the window hides it instead of quitting
             // (handled in on_window_event below), so the tray is the only
@@ -93,6 +100,7 @@ fn main() {
             commands::set_launch_on_startup,
             commands::get_system_proxy_enabled,
             commands::set_system_proxy_enabled,
+            commands::set_language,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application")

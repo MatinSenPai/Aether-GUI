@@ -13,15 +13,18 @@ import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
 import { useConnectionStore } from "@/state/connectionStore";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { AppSettings } from "@/types/connection";
 
 function FieldRow({
   label,
   tooltip,
+  aboutLabel,
   children,
 }: {
   label: string;
   tooltip?: string;
+  aboutLabel: (label: string) => string;
   children: ReactNode;
 }) {
   return (
@@ -30,7 +33,7 @@ function FieldRow({
         {label}
         {tooltip && (
           <Tooltip>
-            <TooltipTrigger aria-label={`About ${label}`}>
+            <TooltipTrigger aria-label={aboutLabel(label)}>
               <Info size={12} />
             </TooltipTrigger>
             <TooltipContent>{tooltip}</TooltipContent>
@@ -60,6 +63,7 @@ export function AdvancedPanel() {
   const setQuickReconnect = useConnectionStore((s) => s.setQuickReconnect);
   const localPort = useConnectionStore((s) => s.profile.local_port);
   const setLocalPort = useConnectionStore((s) => s.setLocalPort);
+  const { t } = useLanguage();
   const [portDraft, setPortDraft] = useState(String(localPort));
   const [open, setOpen] = useState(false);
   // Logs get their own accordion, independent of `open` above — collapsing
@@ -130,7 +134,7 @@ export function AdvancedPanel() {
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger className="flex w-full items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary rounded-md">
           <Settings2 size={14} />
-          Advanced
+          {t.advanced.toggle}
           <ChevronDown
             size={14}
             className="transition-transform duration-150 data-[state=open]:rotate-180"
@@ -140,30 +144,34 @@ export function AdvancedPanel() {
         <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-1 data-[state=open]:duration-150 data-[state=open]:[animation-timing-function:cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-100">
           <div className="flex flex-col gap-4 pb-2">
             <FieldRow
-              label="Protocol"
-              tooltip="MASQUE disguises traffic as normal HTTPS — best against strict censorship. WireGuard is lighter and faster. gool nests two WireGuard tunnels for extra security at a speed cost."
+              label={t.advanced.protocol}
+              tooltip={t.advanced.protocolTooltip}
+              aboutLabel={t.advanced.about}
             >
               <ProtocolSelect />
             </FieldRow>
-            <FieldRow label="Scan Mode">
+            <FieldRow label={t.advanced.scanMode} aboutLabel={t.advanced.about}>
               <ScanModeToggle />
             </FieldRow>
             <FieldRow
-              label="IP Version"
-              tooltip="Which address families to search for working routes. IPv4 is the safest default on most networks."
+              label={t.advanced.ipVersion}
+              tooltip={t.advanced.ipVersionTooltip}
+              aboutLabel={t.advanced.about}
             >
               <IpVersionToggle />
             </FieldRow>
             <FieldRow
-              label="MASQUE Transport"
-              tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
+              label={t.advanced.masqueTransport}
+              tooltip={t.advanced.masqueTransportTooltip}
+              aboutLabel={t.advanced.about}
             >
               <MasqueTransportToggle />
             </FieldRow>
 
             <FieldRow
-              label="Local Port"
-              tooltip="The local SOCKS5 port Aether listens on (127.0.0.1). Change this if 1819 is already used by another app."
+              label={t.advanced.localPort}
+              tooltip={t.advanced.localPortTooltip}
+              aboutLabel={t.advanced.about}
             >
               <input
                 type="number"
@@ -176,52 +184,45 @@ export function AdvancedPanel() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") e.currentTarget.blur();
                 }}
-                aria-label="Local SOCKS5 port"
+                aria-label={t.advanced.localPort}
                 className="w-24 rounded-md bg-surface-2 px-2 py-1 text-xs text-foreground ring-1 ring-white/10 outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
               />
             </FieldRow>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                Quick reconnect
+                {t.advanced.quickReconnect}
                 <Tooltip>
-                  <TooltipTrigger aria-label="About Quick reconnect">
+                  <TooltipTrigger aria-label={t.advanced.about(t.advanced.quickReconnect)}>
                     <Info size={12} />
                   </TooltipTrigger>
-                  <TooltipContent>
-                    Remembers the last gateway that worked and re-tests it first on the next
-                    connect, skipping the full scan when it still works. Turn off to always scan
-                    fresh.
-                  </TooltipContent>
+                  <TooltipContent>{t.advanced.quickReconnectTooltip}</TooltipContent>
                 </Tooltip>
               </div>
               <Switch
                 checked={quickReconnect}
                 onCheckedChange={setQuickReconnect}
                 disabled={locked}
-                aria-label="Quick reconnect"
+                aria-label={t.advanced.quickReconnect}
               />
             </div>
 
             <div className="flex items-center gap-2">
               <div className="h-px flex-1 bg-border" />
               <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                Startup &amp; Tray
+                {t.advanced.startupTray}
               </span>
               <div className="h-px flex-1 bg-border" />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                Launch on Windows startup
+                {t.advanced.launchOnStartup}
                 <Tooltip>
-                  <TooltipTrigger aria-label="About Launch on Windows startup">
+                  <TooltipTrigger aria-label={t.advanced.about(t.advanced.launchOnStartup)}>
                     <Info size={12} />
                   </TooltipTrigger>
-                  <TooltipContent>
-                    Registers Aether-GUI to start automatically when you log in to Windows. It
-                    launches straight to the tray, the same as "Start minimized to tray" below.
-                  </TooltipContent>
+                  <TooltipContent>{t.advanced.launchOnStartupTooltip}</TooltipContent>
                 </Tooltip>
               </div>
               <Switch
@@ -230,49 +231,43 @@ export function AdvancedPanel() {
                   updateAppSetting("launch_on_startup", v, "set_launch_on_startup")
                 }
                 disabled={appSettings === null}
-                aria-label="Launch on Windows startup"
+                aria-label={t.advanced.launchOnStartup}
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                Start minimized to tray
+                {t.advanced.startMinimized}
                 <Tooltip>
-                  <TooltipTrigger aria-label="About Start minimized to tray">
+                  <TooltipTrigger aria-label={t.advanced.about(t.advanced.startMinimized)}>
                     <Info size={12} />
                   </TooltipTrigger>
-                  <TooltipContent>
-                    Keeps the window hidden when Aether-GUI launches — open it again anytime from
-                    the tray icon.
-                  </TooltipContent>
+                  <TooltipContent>{t.advanced.startMinimizedTooltip}</TooltipContent>
                 </Tooltip>
               </div>
               <Switch
                 checked={appSettings?.start_minimized ?? false}
                 onCheckedChange={(v) => updateAppSetting("start_minimized", v, "set_start_minimized")}
                 disabled={appSettings === null}
-                aria-label="Start minimized to tray"
+                aria-label={t.advanced.startMinimized}
               />
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                Auto-connect on launch
+                {t.advanced.autoConnect}
                 <Tooltip>
-                  <TooltipTrigger aria-label="About Auto-connect on launch">
+                  <TooltipTrigger aria-label={t.advanced.about(t.advanced.autoConnect)}>
                     <Info size={12} />
                   </TooltipTrigger>
-                  <TooltipContent>
-                    Starts the tunnel automatically as soon as Aether-GUI launches, using your
-                    last-connected profile.
-                  </TooltipContent>
+                  <TooltipContent>{t.advanced.autoConnectTooltip}</TooltipContent>
                 </Tooltip>
               </div>
               <Switch
                 checked={appSettings?.auto_connect ?? false}
                 onCheckedChange={(v) => updateAppSetting("auto_connect", v, "set_auto_connect")}
                 disabled={appSettings === null}
-                aria-label="Auto-connect on launch"
+                aria-label={t.advanced.autoConnect}
               />
             </div>
 
@@ -280,7 +275,7 @@ export function AdvancedPanel() {
               <CollapsibleTrigger className="flex w-full items-center gap-2 outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md group">
                 <div className="h-px flex-1 bg-border" />
                 <span className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground uppercase group-hover:text-foreground">
-                  Logs{logs.length > 0 && ` (${logs.length})`}
+                  {t.advanced.logs}{logs.length > 0 && ` (${logs.length})`}
                   <ChevronDown
                     size={12}
                     className="transition-transform duration-150 data-[state=open]:rotate-180"
@@ -299,7 +294,7 @@ export function AdvancedPanel() {
                   className="max-h-64 overflow-y-auto rounded-md bg-black/20 p-2 font-mono text-xs text-muted-foreground ring-1 ring-white/10"
                 >
                   {logs.length === 0 ? (
-                    <p className="text-status-idle">No output yet.</p>
+                    <p className="text-status-idle">{t.advanced.noOutput}</p>
                   ) : (
                     logs.map((l, i) => <p key={i}>{l.line}</p>)
                   )}

@@ -1,4 +1,5 @@
 use crate::events::now_millis;
+use crate::i18n;
 use crate::settings;
 use crate::state::{AppState, ConnectionState};
 use crate::sysproxy::ProxyStatus;
@@ -30,10 +31,12 @@ static TICK_GENERATION: AtomicU64 = AtomicU64::new(0);
 /// changes can repaint labels, enabled state, and the checkbox without
 /// rebuilding the whole menu. Populated once by `build`.
 struct TrayItems {
+    open: MenuItem<tauri::Wry>,
     connect: MenuItem<tauri::Wry>,
     disconnect: MenuItem<tauri::Wry>,
     pause_resume: MenuItem<tauri::Wry>,
     system_proxy: CheckMenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
 }
 
 static TRAY_ITEMS: Mutex<Option<TrayItems>> = Mutex::new(None);
@@ -68,23 +71,7 @@ fn format_elapsed(connected_at_ms: u64) -> String {
 }
 
 fn tooltip_text(state: &ConnectionState) -> String {
-    match state {
-        ConnectionState::Idle => "Aether-GUI · Idle".into(),
-        ConnectionState::Launching => "Aether-GUI · Starting…".into(),
-        ConnectionState::Connecting => "Aether-GUI · Finding a route…".into(),
-        ConnectionState::Connected { connected_at_ms, profile_summary, .. } => {
-            format!(
-                "Aether-GUI · Connected · {} · {}",
-                profile_summary,
-                format_elapsed(*connected_at_ms)
-            )
-        }
-        ConnectionState::Reconnecting { attempt, max_attempts } => {
-            format!("Aether-GUI · Reconnecting ({attempt}/{max_attempts})")
-        }
-        ConnectionState::Disconnecting => "Aether-GUI · Disconnecting…".into(),
-        ConnectionState::Error { .. } => "Aether-GUI · Error".into(),
-    }
+    i18n::tooltip(state, format_elapsed)
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -100,25 +87,24 @@ fn show_main_window(app: &AppHandle) {
 /// Proxy" item so the tunnel and the OS proxy setting can both be driven
 /// entirely from the tray, without opening the window.
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let open_item = MenuItem::with_id(app, ID_OPEN, "Open Aether-GUI", true, None::<&str>)?;
-    let connect_item = MenuItem::with_id(app, ID_CONNECT, "Connect", true, None::<&str>)?;
-    let disconnect_item =
-        MenuItem::with_id(app, ID_DISCONNECT, "Stop", false, None::<&str>)?;
+    let open_item = MenuItem::with_id(app, ID_OPEN, i18n::open_app(), true, None::<&str>)?;
+    let connect_item = MenuItem::with_id(app, ID_CONNECT, i18n::connect(), true, None::<&str>)?;
+    let disconnect_item = MenuItem::with_id(app, ID_DISCONNECT, i18n::stop(), false, None::<&str>)?;
     // Label/enabled state gets repainted by sync_system_proxy once the
     // initial preference is known; "Pause protection" is just the starting
     // guess for the common (proxy-currently-on) case.
     let pause_resume_item =
-        MenuItem::with_id(app, ID_PAUSE_RESUME, "Pause Protection", true, None::<&str>)?;
+        MenuItem::with_id(app, ID_PAUSE_RESUME, i18n::pause_protection(), true, None::<&str>)?;
     let system_proxy_enabled = settings::load(app).system_proxy_enabled;
     let system_proxy_item = CheckMenuItem::with_id(
         app,
         ID_SYSTEM_PROXY,
-        "System Proxy",
+        i18n::system_proxy(),
         true,
         system_proxy_enabled,
         None::<&str>,
     )?;
-    let quit_item = MenuItem::with_id(app, ID_QUIT, "Exit", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, ID_QUIT, i18n::exit(), true, None::<&str>)?;
 
     let tray_menu = Menu::with_items(
         app,
@@ -135,10 +121,12 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     )?;
 
     *TRAY_ITEMS.lock().unwrap() = Some(TrayItems {
+        open: open_item,
         connect: connect_item,
         disconnect: disconnect_item,
         pause_resume: pause_resume_item,
         system_proxy: system_proxy_item,
+        quit: quit_item,
     });
 
     let icon = Image::from_bytes(icon_bytes("idle")).expect("embedded tray icon must decode");
@@ -214,11 +202,8 @@ pub fn on_state_change(app: &AppHandle, previous: &ConnectionState, new_state: &
                 return;
             }
             if let Some(tray) = app.tray_by_id(TRAY_ID) {
-                let _ = tray.set_tooltip(Some(format!(
-                    "Aether-GUI · Connected · {} · {}",
-                    profile_summary,
-                    format_elapsed(connected_at_ms)
-                )));
+                let text = i18n::tooltip_connected(&profile_summary, connected_at_ms, format_elapsed);
+                let _ = tray.set_tooltip(Some(text));
             }
         });
     }
@@ -248,9 +233,11 @@ pub fn sync_system_proxy(
         let items = TRAY_ITEMS.lock().unwrap();
         if let Some(items) = items.as_ref() {
             let _ = items.system_proxy.set_checked(user_enabled);
-            let _ = items
-                .pause_resume
-                .set_text(if user_enabled { "Pause Protection" } else { "Resume Protection" });
+            let _ = items.pause_resume.set_text(if user_enabled {
+                i18n::pause_protection()
+            } else {
+                i18n::resume_protection()
+            });
         }
     }
     let icon_category =
@@ -259,6 +246,36 @@ pub fn sync_system_proxy(
         if let Ok(icon) = Image::from_bytes(icon_bytes(icon_category)) {
             let _ = tray.set_icon(Some(icon));
         }
+    }
+}
+
+/// Called from the `set_language` command right after `i18n::set`, so every
+/// tray surface — menu labels and tooltip — updates immediately instead of
+/// waiting for the next connection-state change or proxy toggle to happen
+/// to repaint them.
+pub fn retranslate(app: &AppHandle) {
+    {
+        let items = TRAY_ITEMS.lock().unwrap();
+        if let Some(items) = items.as_ref() {
+            let _ = items.open.set_text(i18n::open_app());
+            let _ = items.connect.set_text(i18n::connect());
+            let _ = items.disconnect.set_text(i18n::stop());
+            let _ = items.system_proxy.set_text(i18n::system_proxy());
+            // Pause/Resume's label depends on the current preference, not
+            // just the language — re-derive it the same way
+            // sync_system_proxy does rather than assuming "Pause".
+            let user_enabled = settings::load(app).system_proxy_enabled;
+            let _ = items.pause_resume.set_text(if user_enabled {
+                i18n::pause_protection()
+            } else {
+                i18n::resume_protection()
+            });
+            let _ = items.quit.set_text(i18n::exit());
+        }
+    }
+    if let Some(state) = app.try_state::<AppState>() {
+        let status = state.manager.lock().unwrap().status();
+        let _ = app.tray_by_id(TRAY_ID).map(|tray| tray.set_tooltip(Some(tooltip_text(&status))));
     }
 }
 
@@ -288,16 +305,17 @@ fn notify(app: &AppHandle, previous: &ConnectionState, new_state: &ConnectionSta
 
     let body: Option<String> = match (previous, new_state) {
         (_, ConnectionState::Connected { profile_summary, .. }) => {
-            Some(format!("Connected — {profile_summary}"))
+            Some(i18n::notification_connected(profile_summary))
         }
         (ConnectionState::Connected { .. } | ConnectionState::Disconnecting, ConnectionState::Idle) => {
-            Some("Disconnected.".into())
+            Some(i18n::notification_disconnected().to_string())
         }
-        (_, ConnectionState::Error { message, .. }) => Some(format!("Connection error: {message}")),
+        (_, ConnectionState::Error { message, .. }) => Some(i18n::notification_error(message)),
         _ => None,
     };
 
     if let Some(body) = body {
-        let _ = app.notification().builder().title("Aether-GUI").body(body).show();
+        let _ =
+            app.notification().builder().title(i18n::notification_title()).body(body).show();
     }
 }

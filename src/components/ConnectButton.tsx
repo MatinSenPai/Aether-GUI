@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Loader2, Power } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useConnectionStore } from "@/state/connectionStore";
 import { useWindowFocused } from "@/state/windowFocus";
+import { useLanguage } from "@/i18n/LanguageContext";
 import type { ConnectionStatus } from "@/types/connection";
 
 type Phase = "idle" | "connecting" | "connected" | "error";
@@ -63,21 +64,21 @@ const ICONS: Record<Phase, typeof Power> = {
   error: AlertTriangle,
 };
 
-const ARIA_LABEL: Record<Phase, string> = {
-  idle: "Connect",
-  connecting: "Cancel connecting",
-  connected: "Disconnect",
-  error: "Retry connection",
-};
-
 export function ConnectButton() {
   const status = useConnectionStore((s) => s.status);
   const connect = useConnectionStore((s) => s.connect);
   const disconnect = useConnectionStore((s) => s.disconnect);
   const focused = useWindowFocused();
+  const { t } = useLanguage();
 
   const phase = phaseOf(status);
   const Icon = ICONS[phase];
+  const ariaLabel: Record<Phase, string> = {
+    idle: t.connectButton.connect,
+    connecting: t.connectButton.cancelConnecting,
+    connected: t.connectButton.disconnect,
+    error: t.connectButton.retryConnection,
+  };
   // Unfocused = nobody is watching, and any running animation keeps the
   // WebView2 compositor redrawing at 60fps in the background — pause (not
   // remove) so nothing jumps on refocus. Inline style, NOT a Tailwind
@@ -98,7 +99,7 @@ export function ConnectButton() {
   return (
     <motion.button
       type="button"
-      aria-label={ARIA_LABEL[phase]}
+      aria-label={ariaLabel[phase]}
       onClick={handleClick}
       disabled={status.state === "Disconnecting"}
       whileTap={{ scale: 0.97 }}
