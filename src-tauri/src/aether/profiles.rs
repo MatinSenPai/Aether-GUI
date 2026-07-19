@@ -89,11 +89,35 @@ impl IpVersion {
     }
 }
 
-/// Note: there is no `obfuscation_profile` field — it is auto-selected and
-/// merely logged, never prompted. `local_port` IS user-configurable: Aether
-/// accepts `--bind <ip:port>` (see cli.rs upstream), it just isn't one of
-/// the three interactive prompts (protocol / scan mode / IP version) that
-/// appear when it's left unset.
+/// Real accepted values per Aether's own `aethernoize::from_profile` (the
+/// `--noize` USAGE text also lists "firewall"/"gfw" as aliases, but those
+/// aren't actually matched anywhere in the parser — anything unrecognized
+/// silently falls through to `Balanced`, so we stick to the four names the
+/// code actually branches on).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum NoizeProfile {
+    Off,
+    Light,
+    Balanced,
+    Aggressive,
+}
+
+impl NoizeProfile {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NoizeProfile::Off => "off",
+            NoizeProfile::Light => "light",
+            NoizeProfile::Balanced => "balanced",
+            NoizeProfile::Aggressive => "aggressive",
+        }
+    }
+}
+
+/// `local_port` and `noize_profile` ARE user-configurable via CLI flags
+/// (`--bind`, `--noize`) even though neither is one of the three interactive
+/// prompts (protocol / scan mode / IP version) Aether's own setup asks —
+/// they just need to be passed up front to skip being asked at all.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub protocol: Protocol,
@@ -116,6 +140,18 @@ pub struct ConnectionProfile {
     /// new interactive "MASQUE transport" prompt in both directions.
     #[serde(default)]
     pub masque_http2: bool,
+    /// Traffic obfuscation profile (`--noize`). Aether's own default when
+    /// unset is "balanced", so that's ours too — this field only changes
+    /// the command line when the user picks something else.
+    #[serde(default = "default_noize_profile")]
+    pub noize_profile: NoizeProfile,
+    /// Fragments the TLS ClientHello on the HTTP/2 transport (`--fragment`).
+    /// Only has an effect together with `masque_http2` — Aether ignores it
+    /// otherwise, since HTTP/3 has no TLS ClientHello of its own to
+    /// fragment. Off by default: it adds latency to the handshake, so it's
+    /// an opt-in for networks that specifically need it.
+    #[serde(default)]
+    pub fragment_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -124,6 +160,10 @@ fn default_true() -> bool {
 
 fn default_local_port() -> u16 {
     1819
+}
+
+fn default_noize_profile() -> NoizeProfile {
+    NoizeProfile::Balanced
 }
 
 impl ConnectionProfile {
@@ -168,6 +208,15 @@ impl ConnectionProfile {
             args.push("--bind".into());
             args.push(format!("127.0.0.1:{}", self.local_port));
         }
+        // Only pass --noize when it's not Aether's own default, same
+        // reasoning as --bind above.
+        if self.noize_profile != default_noize_profile() {
+            args.push("--noize".into());
+            args.push(self.noize_profile.label().into());
+        }
+        if self.fragment_enabled {
+            args.push("--fragment".into());
+        }
         args
     }
 
@@ -189,6 +238,8 @@ impl Default for ConnectionProfile {
             local_port: default_local_port(),
             quick_reconnect: true,
             masque_http2: false,
+            noize_profile: default_noize_profile(),
+            fragment_enabled: false,
         }
     }
 }

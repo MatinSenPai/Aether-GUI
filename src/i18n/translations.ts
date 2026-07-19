@@ -102,6 +102,25 @@ export const translations = {
       http3Desc: "QUIC over UDP — fastest handshake, best on networks that don't interfere with UDP.",
       http2Desc: "TCP — looks like ordinary HTTPS. Use when UDP/QUIC is blocked or throttled by the network.",
     },
+    expert: {
+      toggle: "Expert",
+      noizeProfile: "Obfuscation",
+      noizeProfileTooltip:
+        "Disguises the tunnel's traffic pattern to make it harder for a censor to fingerprint. Stronger settings add a little latency.",
+      fragment: "Fragment ClientHello",
+      fragmentTooltip:
+        "Splits the TLS ClientHello into pieces on the HTTP/2 transport, defeating censors that block on the whole handshake in one packet. Only applies when MASQUE Transport is set to HTTP/2 — has no effect on HTTP/3.",
+    },
+    noizeProfile: {
+      off: "Off",
+      light: "Light",
+      balanced: "Balanced",
+      aggressive: "Aggressive",
+      offDesc: "No traffic obfuscation. Fastest, but the easiest pattern for a censor to fingerprint.",
+      lightDesc: "Light disguising — a small amount of junk traffic around the handshake.",
+      balancedDesc: "Aether's own default — reasonable disguising without much added latency.",
+      aggressiveDesc: "Heaviest disguising, most junk traffic — best against strict censorship, at some cost to speed.",
+    },
     theme: {
       label: "Theme",
       aether: "Aether Orange",
@@ -204,6 +223,25 @@ export const translations = {
       http2: "HTTP/2",
       http3Desc: "کوییک روی UDP — سریع‌ترین دست‌دهی، بهترین گزینه در شبکه‌هایی که با UDP تداخل ندارن.",
       http2Desc: "TCP — شبیه HTTPS معمولی. وقتی UDP/کوییک توسط شبکه مسدود یا محدود شده ازش استفاده کن.",
+    },
+    expert: {
+      toggle: "پیشرفته حرفه‌ای",
+      noizeProfile: "مبهم‌سازی ترافیک",
+      noizeProfileTooltip:
+        "الگوی ترافیک تونل رو تغییر می‌ده تا شناسایی و اثرانگشت‌گیریش برای سانسورچی سخت‌تر بشه. تنظیمات قوی‌تر کمی تأخیر اضافه می‌کنن.",
+      fragment: "قطعه‌قطعه‌کردن ClientHello",
+      fragmentTooltip:
+        "پیام ClientHello تی‌ال‌اس رو روی ترنسپورت HTTP/2 به چند تکه می‌شکنه تا سانسورهایی که کل دست‌دهی رو تو یه پکت مسدود می‌کنن دور زده بشن. فقط وقتی ترنسپورت MASQUE روی HTTP/2 باشه اثر داره — روی HTTP/3 تأثیری نداره.",
+    },
+    noizeProfile: {
+      off: "خاموش",
+      light: "سبک",
+      balanced: "متعادل",
+      aggressive: "قوی",
+      offDesc: "بدون مبهم‌سازی ترافیک. سریع‌ترین حالت، ولی راحت‌ترین الگو برای شناسایی توسط سانسورچی.",
+      lightDesc: "مبهم‌سازی سبک — مقدار کمی ترافیک بی‌مصرف اطراف دست‌دهی.",
+      balancedDesc: "پیش‌فرض خودِ Aether — مبهم‌سازی معقول بدون تأخیر اضافه‌ی زیاد.",
+      aggressiveDesc: "سنگین‌ترین مبهم‌سازی، بیشترین ترافیک بی‌مصرف — بهترین گزینه در برابر سانسور شدید، با هزینه‌ی سرعت.",
     },
     theme: {
       label: "پوسته رنگی",

@@ -4,6 +4,7 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { ConnectionStatusLine } from "@/components/ConnectionStatusLine";
 import { SystemProxyToggle } from "@/components/SystemProxyToggle";
 import { AdvancedPanel } from "@/components/AdvancedPanel";
+import { ExpertPanel } from "@/components/ExpertPanel";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,6 +36,7 @@ function MainScreen() {
           <SystemProxyToggle />
         </div>
         <AdvancedPanel />
+        <ExpertPanel />
       </div>
     </div>
   );

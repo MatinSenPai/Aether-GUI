@@ -13,6 +13,7 @@ export type ConnectionStatus =
 export type Protocol = "auto" | "masque" | "wireguard" | "gool";
 export type ScanMode = "turbo" | "balanced" | "thorough" | "stealth";
 export type IpVersion = "v4" | "v6" | "both";
+export type NoizeProfile = "off" | "light" | "balanced" | "aggressive";
 
 export interface ConnectionProfile {
   protocol: Protocol;
@@ -26,6 +27,12 @@ export interface ConnectionProfile {
   /** Aether ≥1.2.0: run MASQUE over HTTP/2 (TCP) instead of the default
    * HTTP/3 (QUIC) — for networks that block or throttle UDP. */
   masque_http2: boolean;
+  /** Traffic obfuscation profile (`--noize`). Aether's own default is
+   * "balanced". */
+  noize_profile: NoizeProfile;
+  /** Fragments the TLS ClientHello on the HTTP/2 transport (`--fragment`).
+   * Only has an effect together with `masque_http2`. */
+  fragment_enabled: boolean;
 }
 
 export interface LogLine {

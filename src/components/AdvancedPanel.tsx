@@ -16,7 +16,7 @@ import { useConnectionStore } from "@/state/connectionStore";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { AppSettings } from "@/types/connection";
 
-function FieldRow({
+export function FieldRow({
   label,
   tooltip,
   aboutLabel,
