@@ -31,6 +31,7 @@ pub enum ScanMode {
     Balanced,
     Thorough,
     Stealth,
+    Ironclad,
 }
 
 impl ScanMode {
@@ -40,6 +41,7 @@ impl ScanMode {
             ScanMode::Balanced => "2",
             ScanMode::Thorough => "3",
             ScanMode::Stealth => "4",
+            ScanMode::Ironclad => "5",
         }
     }
 }
@@ -110,6 +112,7 @@ impl ConnectionProfile {
             ScanMode::Balanced => "--balanced",
             ScanMode::Thorough => "--thorough",
             ScanMode::Stealth => "--stealth",
+            ScanMode::Ironclad => "--ironclad",
         });
         args.push(match self.ip_version {
             IpVersion::V4 => "-4",

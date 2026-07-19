@@ -1,3 +1,4 @@
+use super::profiles::ScanMode;
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
@@ -16,11 +17,19 @@ pub fn port_is_live() -> bool {
     TcpStream::connect_timeout(&socks_addr(), Duration::from_millis(300)).is_ok()
 }
 
-/// Empirically (manually running v1.0.1 to completion), Aether's own route-
-/// discovery budget goes up to 120s for MASQUE and 80s for WireGuard (its
-/// own "budget=..." log line). The GUI's connect timeout must exceed both,
-/// or it would fire while Aether is still legitimately scanning for a route.
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(150);
+/// Aether's own route-discovery budget varies by scan mode — turbo finishes
+/// in seconds, ironclad opens a real tunnel through every candidate and can
+/// run for minutes. Each timeout is set to Aether's typical budget for that
+/// mode plus a margin, so the GUI never kills a scan that's still working.
+pub fn connect_timeout(scan_mode: &ScanMode) -> Duration {
+    match scan_mode {
+        ScanMode::Turbo => Duration::from_secs(60),
+        ScanMode::Balanced => Duration::from_secs(150),
+        ScanMode::Thorough => Duration::from_secs(180),
+        ScanMode::Stealth => Duration::from_secs(180),
+        ScanMode::Ironclad => Duration::from_secs(240),
+    }
+}
 
 /// How long to wait after sending Ctrl-C before force-killing. Manually
 /// testing shutdown against the real binary showed it does NOT exit quickly

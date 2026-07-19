@@ -11,7 +11,7 @@ export type ConnectionStatus =
   | { state: "Error"; message: string; phase: string };
 
 export type Protocol = "auto" | "masque" | "wireguard" | "gool";
-export type ScanMode = "turbo" | "balanced" | "thorough" | "stealth";
+export type ScanMode = "turbo" | "balanced" | "thorough" | "stealth" | "ironclad";
 export type IpVersion = "v4" | "v6" | "both";
 
 export interface ConnectionProfile {
