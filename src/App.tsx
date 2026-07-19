@@ -18,7 +18,7 @@ const SCREEN_TRANSITION = {
 
 function MainScreen() {
   return (
-    <div className="relative z-10 flex h-full flex-col items-center p-6">
+    <div className="relative z-10 flex h-full flex-col items-center overflow-y-auto p-6">
       <div className="flex flex-1 flex-col items-center justify-center gap-6">
         <ConnectButton />
         <ConnectionStatusLine />

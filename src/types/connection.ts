@@ -13,6 +13,8 @@ export type ConnectionStatus =
 export type Protocol = "auto" | "masque" | "wireguard" | "gool";
 export type ScanMode = "turbo" | "balanced" | "thorough" | "stealth";
 export type IpVersion = "v4" | "v6" | "both";
+export type MasqueNoize = "firewall" | "gfw" | "off";
+export type WgNoize = "balanced" | "aggressive" | "light" | "off";
 
 export interface ConnectionProfile {
   protocol: Protocol;
@@ -24,6 +26,10 @@ export interface ConnectionProfile {
   /** Aether ≥1.2.0: run MASQUE over HTTP/2 (TCP) instead of the default
    * HTTP/3 (QUIC) — for networks that block or throttle UDP. */
   masque_http2: boolean;
+  /** Obfuscation profile for MASQUE (firewall/gfw/off). */
+  masque_noize: MasqueNoize;
+  /** Obfuscation profile for WireGuard/gool (balanced/aggressive/light/off). */
+  wg_noize: WgNoize;
 }
 
 export interface LogLine {

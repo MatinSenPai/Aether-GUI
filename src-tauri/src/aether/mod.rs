@@ -237,7 +237,9 @@ fn monitor_connect(
     data_dir: PathBuf,
     profile: ConnectionProfile,
 ) {
-    let deadline = Instant::now() + status::CONNECT_TIMEOUT;
+    let deadline = Instant::now() + status::connect_timeout(
+        &profile.scan_mode, &profile.protocol, &profile.masque_noize, &profile.wg_noize,
+    );
     let mut announced_connecting = false;
 
     loop {

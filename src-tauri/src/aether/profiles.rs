@@ -62,11 +62,47 @@ impl IpVersion {
     }
 }
 
-/// Note: there is no `local_port` or `obfuscation_profile` field. Manually
-/// running Aether v1.0.1 end to end showed it only ever prompts for these
-/// three settings (protocol / scan mode / IP version) regardless of protocol
-/// choice — the local port is fixed at 1819 by Aether itself, and the
-/// obfuscation profile is auto-selected and merely logged, never prompted.
+/// Obfuscation profile for MASQUE connections. The profile shapes how much
+/// junk/padding Aether injects to disguise the handshake from DPI.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum MasqueNoize {
+    Firewall,
+    Gfw,
+    Off,
+}
+
+impl MasqueNoize {
+    pub fn as_flag(&self) -> &'static str {
+        match self {
+            MasqueNoize::Firewall => "firewall",
+            MasqueNoize::Gfw => "gfw",
+            MasqueNoize::Off => "off",
+        }
+    }
+}
+
+/// Obfuscation profile for WireGuard and gool connections.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WgNoize {
+    Balanced,
+    Aggressive,
+    Light,
+    Off,
+}
+
+impl WgNoize {
+    pub fn as_flag(&self) -> &'static str {
+        match self {
+            WgNoize::Balanced => "balanced",
+            WgNoize::Aggressive => "aggressive",
+            WgNoize::Light => "light",
+            WgNoize::Off => "off",
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub protocol: Protocol,
@@ -84,10 +120,26 @@ pub struct ConnectionProfile {
     /// new interactive "MASQUE transport" prompt in both directions.
     #[serde(default)]
     pub masque_http2: bool,
+    /// Obfuscation profile for MASQUE (firewall/gfw/off). Passed as
+    /// `--noize <value>`. Only sent when the active protocol is MASQUE-based.
+    #[serde(default = "default_masque_noize")]
+    pub masque_noize: MasqueNoize,
+    /// Obfuscation profile for WireGuard/gool (balanced/aggressive/light/off).
+    /// Only sent when the active protocol is WireGuard or gool.
+    #[serde(default = "default_wg_noize")]
+    pub wg_noize: WgNoize,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_masque_noize() -> MasqueNoize {
+    MasqueNoize::Firewall
+}
+
+fn default_wg_noize() -> WgNoize {
+    WgNoize::Balanced
 }
 
 impl ConnectionProfile {
@@ -98,7 +150,7 @@ impl ConnectionProfile {
     /// "reconnect with last gateway?" question, which the GUI must never
     /// leave unanswered.
     pub fn as_args(&self) -> Vec<&'static str> {
-        let mut args = Vec::with_capacity(4);
+        let mut args = Vec::with_capacity(6);
         match self.protocol {
             Protocol::Auto => {} // Aether's own default (MASQUE)
             Protocol::Masque => args.push("--masque"),
@@ -117,6 +169,13 @@ impl ConnectionProfile {
             IpVersion::Both => "--dual",
         });
         args.push(if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" });
+        // Noize profile — pick the value matching the active protocol family.
+        // Auto resolves to MASQUE, so it uses the MASQUE noize set.
+        args.push("--noize");
+        args.push(match self.protocol {
+            Protocol::Auto | Protocol::Masque => self.masque_noize.as_flag(),
+            Protocol::Wireguard | Protocol::Gool => self.wg_noize.as_flag(),
+        });
         args
     }
 }
@@ -130,6 +189,8 @@ impl Default for ConnectionProfile {
             ip_version: IpVersion::V4,
             quick_reconnect: true,
             masque_http2: false,
+            masque_noize: MasqueNoize::Firewall,
+            wg_noize: WgNoize::Balanced,
         }
     }
 }

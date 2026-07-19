@@ -1,3 +1,4 @@
+use super::profiles::{MasqueNoize, Protocol, ScanMode, WgNoize};
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
@@ -16,11 +17,34 @@ pub fn port_is_live() -> bool {
     TcpStream::connect_timeout(&socks_addr(), Duration::from_millis(300)).is_ok()
 }
 
-/// Empirically (manually running v1.0.1 to completion), Aether's own route-
-/// discovery budget goes up to 120s for MASQUE and 80s for WireGuard (its
-/// own "budget=..." log line). The GUI's connect timeout must exceed both,
-/// or it would fire while Aether is still legitimately scanning for a route.
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(150);
+/// Aether's own route-discovery budget varies by scan mode and obfuscation
+/// profile — heavier obfuscation adds decoy traffic and inter-packet delays,
+/// stretching every scan. The GUI's timeout must exceed the expected budget
+/// or it would kill Aether while it's still legitimately scanning.
+pub fn connect_timeout(scan_mode: &ScanMode, protocol: &Protocol, masque_noize: &MasqueNoize, wg_noize: &WgNoize) -> Duration {
+    let base = match scan_mode {
+        ScanMode::Turbo => 60u64,
+        ScanMode::Balanced => 150,
+        ScanMode::Thorough => 180,
+        ScanMode::Stealth => 180,
+    };
+    // Heavier obfuscation profiles pad handshakes and add inter-packet
+    // delays, so scans take longer. Add a percentage on top of the base.
+    let noize_extra_pct = match protocol {
+        Protocol::Auto | Protocol::Masque => match masque_noize {
+            MasqueNoize::Firewall => 0,
+            MasqueNoize::Gfw => 25,
+            MasqueNoize::Off => 0,
+        },
+        Protocol::Wireguard | Protocol::Gool => match wg_noize {
+            WgNoize::Balanced => 0,
+            WgNoize::Aggressive => 30,
+            WgNoize::Light => 0,
+            WgNoize::Off => 0,
+        },
+    };
+    Duration::from_secs(base + base * noize_extra_pct / 100)
+}
 
 /// How long to wait after sending Ctrl-C before force-killing. Manually
 /// testing shutdown against the real binary showed it does NOT exit quickly
