@@ -330,8 +330,13 @@ fn monitor_connect(
     }
 }
 
-/// Watches an established connection purely for an unexpected process exit —
-/// there is no polling needed beyond that once `Connected` is reached.
+/// Watches an established connection two ways: an unexpected process exit
+/// (cheap, checked every tick) and, periodically, whether the tunnel is
+/// actually still forwarding traffic (`status::tunnel_is_live`) — the
+/// process staying alive is NOT sufficient proof of that; see
+/// `status::port_is_live`'s doc comment for why the old "just watch for
+/// process exit" approach let a dead-but-still-running tunnel sit at
+/// `Connected` indefinitely with no way for the user to tell.
 fn monitor_connected(
     app: AppHandle,
     manager: Arc<Mutex<AetherManager>>,
@@ -339,6 +344,9 @@ fn monitor_connected(
     data_dir: PathBuf,
     profile: ConnectionProfile,
 ) {
+    let mut next_probe = Instant::now() + status::HEALTH_PROBE_INTERVAL;
+    let mut consecutive_failures = 0u32;
+
     loop {
         std::thread::sleep(Duration::from_millis(500));
         let mut mgr = manager.lock().unwrap();
@@ -359,6 +367,50 @@ fn monitor_connected(
             );
             return;
         }
+
+        if Instant::now() < next_probe {
+            continue;
+        }
+        next_probe = Instant::now() + status::HEALTH_PROBE_INTERVAL;
+        // Release the lock before blocking on network I/O — probing can
+        // take up to HEALTH_PROBE_TIMEOUT, and nothing else here needs the
+        // manager held for that long (request_disconnect, the tray, etc.
+        // would otherwise stall waiting on this every 12s).
+        drop(mgr);
+
+        if status::tunnel_is_live(profile.local_port, status::HEALTH_PROBE_TIMEOUT) {
+            consecutive_failures = 0;
+            continue;
+        }
+
+        consecutive_failures += 1;
+        if consecutive_failures < status::HEALTH_PROBE_FAILURE_THRESHOLD {
+            continue;
+        }
+
+        // Sustained failure: the process itself doesn't know its tunnel is
+        // dead (that's the whole problem), so force the issue by killing it
+        // ourselves and handing off to the exact same retry path a real
+        // process exit would take — a clean respawn, not a special case.
+        let mut mgr = manager.lock().unwrap();
+        if mgr.user_requested_stop {
+            return;
+        }
+        if let Some(session) = mgr.session.as_mut() {
+            session.kill();
+        }
+        mgr.session = None;
+        drop(mgr);
+        handle_unexpected_failure(
+            app,
+            manager,
+            binary,
+            data_dir,
+            profile,
+            "Tunnel stopped responding".into(),
+            "connected",
+        );
+        return;
     }
 }
 
