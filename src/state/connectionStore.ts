@@ -37,6 +37,8 @@ interface ConnectionState {
   setMasqueHttp2: (masque_http2: boolean) => void;
   setNoizeProfile: (noize_profile: ConnectionProfile["noize_profile"]) => void;
   setFragmentEnabled: (fragment_enabled: boolean) => void;
+  setLanAccessEnabled: (lan_access_enabled: boolean) => void;
+  setLanPort: (lan_port: number | null) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -51,6 +53,8 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     masque_http2: false,
     noize_profile: "balanced",
     fragment_enabled: false,
+    lan_access_enabled: false,
+    lan_port: null,
   },
   logs: [],
   sidecarError: null,
@@ -106,6 +110,12 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setFragmentEnabled: (fragment_enabled) =>
     set((s) => ({ profile: { ...s.profile, fragment_enabled } })),
+
+  setLanAccessEnabled: (lan_access_enabled) =>
+    set((s) => ({ profile: { ...s.profile, lan_access_enabled } })),
+
+  setLanPort: (lan_port) =>
+    set((s) => ({ profile: { ...s.profile, lan_port } })),
 
   setSystemProxyEnabled: async (enabled) => {
     const previous = get().systemProxyEnabled;

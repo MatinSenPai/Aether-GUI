@@ -94,6 +94,7 @@ fn main() {
             commands::get_status,
             commands::get_default_profile,
             commands::set_default_profile,
+            commands::get_lan_ip,
             commands::get_app_settings,
             commands::set_start_minimized,
             commands::set_auto_connect,

@@ -33,6 +33,12 @@ export interface ConnectionProfile {
   /** Fragments the TLS ClientHello on the HTTP/2 transport (`--fragment`).
    * Only has an effect together with `masque_http2`. */
   fragment_enabled: boolean;
+  /** Binds the SOCKS5 listener to `0.0.0.0` instead of loopback-only, so
+   * other devices on the LAN can use it too (`--bind 0.0.0.0:<port>`). */
+  lan_access_enabled: boolean;
+  /** Port to bind when `lan_access_enabled` is set. `null` means "use
+   * `local_port`". */
+  lan_port: number | null;
 }
 
 export interface LogLine {

@@ -63,8 +63,17 @@ export function AdvancedPanel() {
   const setQuickReconnect = useConnectionStore((s) => s.setQuickReconnect);
   const localPort = useConnectionStore((s) => s.profile.local_port);
   const setLocalPort = useConnectionStore((s) => s.setLocalPort);
+  const lanAccessEnabled = useConnectionStore((s) => s.profile.lan_access_enabled);
+  const setLanAccessEnabled = useConnectionStore((s) => s.setLanAccessEnabled);
+  const lanPort = useConnectionStore((s) => s.profile.lan_port);
+  const setLanPort = useConnectionStore((s) => s.setLanPort);
   const { t } = useLanguage();
   const [portDraft, setPortDraft] = useState(String(localPort));
+  const [lanPortDraft, setLanPortDraft] = useState(lanPort === null ? "" : String(lanPort));
+  // Fetched once regardless of whether LAN access is on yet, so the hint
+  // ("Other devices can connect to …") is ready the instant the user flips
+  // the switch instead of popping in a beat later.
+  const [lanIp, setLanIp] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   // Logs get their own accordion, independent of `open` above — collapsing
   // it must never touch the Advanced panel's own open/closed state, and
@@ -86,6 +95,12 @@ export function AdvancedPanel() {
     invoke<AppSettings>("get_app_settings")
       .then(setAppSettings)
       .catch((e) => console.error("Failed to load app settings:", e));
+  }, []);
+
+  useEffect(() => {
+    invoke<string | null>("get_lan_ip")
+      .then(setLanIp)
+      .catch((e) => console.error("Failed to resolve LAN IP:", e));
   }, []);
 
   function updateAppSetting<K extends keyof AppSettings>(
@@ -120,12 +135,31 @@ export function AdvancedPanel() {
     setPortDraft(String(localPort));
   }, [localPort]);
 
+  useEffect(() => {
+    setLanPortDraft(lanPort === null ? "" : String(lanPort));
+  }, [lanPort]);
+
   function commitPortDraft() {
     const parsed = Number(portDraft);
     if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
       setLocalPort(parsed);
     } else {
       setPortDraft(String(localPort)); // invalid entry: revert to last valid value
+    }
+  }
+
+  // Empty is a valid, meaningful value here ("use Local Port") — only an
+  // actually-typed-but-out-of-range number gets reverted.
+  function commitLanPortDraft() {
+    if (lanPortDraft.trim() === "") {
+      setLanPort(null);
+      return;
+    }
+    const parsed = Number(lanPortDraft);
+    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+      setLanPort(parsed);
+    } else {
+      setLanPortDraft(lanPort === null ? "" : String(lanPort)); // revert
     }
   }
 
@@ -188,6 +222,50 @@ export function AdvancedPanel() {
                 className="w-24 rounded-md bg-surface-2 px-2 py-1 text-xs text-foreground ring-1 ring-white/10 outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
               />
             </FieldRow>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {t.advanced.allowLan}
+                  <Tooltip>
+                    <TooltipTrigger aria-label={t.advanced.about(t.advanced.allowLan)}>
+                      <Info size={12} />
+                    </TooltipTrigger>
+                    <TooltipContent>{t.advanced.allowLanTooltip}</TooltipContent>
+                  </Tooltip>
+                </div>
+                <Switch
+                  checked={lanAccessEnabled}
+                  onCheckedChange={setLanAccessEnabled}
+                  disabled={locked}
+                  aria-label={t.advanced.allowLan}
+                />
+              </div>
+              {lanAccessEnabled && (
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={lanPortDraft}
+                    disabled={locked}
+                    placeholder={t.advanced.allowLanPortPlaceholder}
+                    onChange={(e) => setLanPortDraft(e.target.value)}
+                    onBlur={commitLanPortDraft}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                    aria-label={t.advanced.allowLan}
+                    className="w-32 rounded-md bg-surface-2 px-2 py-1 text-xs text-foreground ring-1 ring-white/10 outline-none placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                  />
+                  {lanIp && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {t.advanced.lanAddressHint(`${lanIp}:${lanPort ?? localPort}`)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">

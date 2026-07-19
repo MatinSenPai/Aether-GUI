@@ -152,6 +152,21 @@ pub struct ConnectionProfile {
     /// an opt-in for networks that specifically need it.
     #[serde(default)]
     pub fragment_enabled: bool,
+    /// Exposes the SOCKS5 listener to the LAN by passing `--bind 0.0.0.0:<port>`
+    /// instead of loopback-only `127.0.0.1:<port>`. Aether itself already
+    /// accepts any bind address (see cli.rs upstream) — this is purely a
+    /// GUI-side choice of *which* address to pass, no change to Aether
+    /// needed. Binding `0.0.0.0` still accepts local 127.0.0.1 connections
+    /// too, so `socks_addr` (used for this machine's own system proxy, see
+    /// sysproxy.rs) is unaffected either way.
+    #[serde(default)]
+    pub lan_access_enabled: bool,
+    /// Port to bind when `lan_access_enabled` is set. `None` — left blank in
+    /// the UI — means "use `local_port`"; most people running one profile
+    /// don't need a second port just for LAN, so an empty field falling
+    /// back to the port they already picked is one less number to manage.
+    #[serde(default)]
+    pub lan_port: Option<u16>,
 }
 
 fn default_true() -> bool {
@@ -201,10 +216,18 @@ impl ConnectionProfile {
         args.push(
             if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" }.into(),
         );
-        // Only pass --bind when it differs from Aether's own default, so a
-        // stock profile's spawned command line stays identical to before
-        // this field existed.
-        if self.local_port != default_local_port() {
+        // LAN access takes priority over the loopback-only branch below: it
+        // changes which *interface* Aether binds, not just the port, so it
+        // must always be passed explicitly regardless of whether the
+        // effective port happens to match Aether's own default.
+        if self.lan_access_enabled {
+            let port = self.lan_port.unwrap_or(self.local_port);
+            args.push("--bind".into());
+            args.push(format!("0.0.0.0:{port}"));
+        } else if self.local_port != default_local_port() {
+            // Only pass --bind when it differs from Aether's own default, so
+            // a stock profile's spawned command line stays identical to
+            // before this field existed.
             args.push("--bind".into());
             args.push(format!("127.0.0.1:{}", self.local_port));
         }
@@ -240,6 +263,8 @@ impl Default for ConnectionProfile {
             masque_http2: false,
             noize_profile: default_noize_profile(),
             fragment_enabled: false,
+            lan_access_enabled: false,
+            lan_port: None,
         }
     }
 }

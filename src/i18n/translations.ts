@@ -57,6 +57,11 @@ export const translations = {
       localPort: "Local Port",
       localPortTooltip:
         "The local SOCKS5 port Aether listens on (127.0.0.1). Change this if 1819 is already used by another app.",
+      allowLan: "Allow LAN",
+      allowLanTooltip:
+        "Lets other devices on your network use this SOCKS5 proxy too, by listening on all network interfaces instead of just this PC. Windows may prompt for a firewall exception the first time — allow it, or other devices won't be able to connect.",
+      allowLanPortPlaceholder: "Same as Local Port",
+      lanAddressHint: (addr: string) => `Other devices can connect to ${addr}`,
       quickReconnect: "Quick reconnect",
       quickReconnectTooltip:
         "Remembers the last gateway that worked and re-tests it first on the next connect, skipping the full scan when it still works. Turn off to always scan fresh.",
@@ -180,6 +185,11 @@ export const translations = {
       localPort: "پورت محلی",
       localPortTooltip:
         "پورت SOCKS5 محلی که Aether روش گوش می‌ده (127.0.0.1). اگه پورت 1819 توسط برنامه‌ی دیگه‌ای استفاده می‌شه اینو عوض کن.",
+      allowLan: "دسترسی LAN",
+      allowLanTooltip:
+        "به دستگاه‌های دیگه‌ی شبکه‌ات اجازه می‌ده از همین پراکسی SOCKS5 استفاده کنن — به‌جای فقط این سیستم، رو همه‌ی رابط‌های شبکه گوش می‌ده. ممکنه بار اول ویندوز یه پیام استثنای فایروال نشون بده — تأییدش کن، وگرنه دستگاه‌های دیگه نمی‌تونن وصل بشن.",
+      allowLanPortPlaceholder: "مثل پورت محلی",
+      lanAddressHint: (addr: string) => `دستگاه‌های دیگه می‌تونن به ${addr} وصل بشن`,
       quickReconnect: "اتصال سریع مجدد",
       quickReconnectTooltip:
         "آخرین گیت‌وی موفق رو به خاطر می‌سپاره و دفعه‌ی بعد اول همون رو امتحان می‌کنه، و اگه هنوز کار می‌کنه از اسکن کامل صرف‌نظر می‌کنه. برای اسکن کامل و تازه هر بار، خاموشش کن.",

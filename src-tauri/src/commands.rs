@@ -35,6 +35,20 @@ pub fn set_default_profile(app: AppHandle, profile: ConnectionProfile) -> Result
     Ok(())
 }
 
+/// Best-effort local network IP, shown next to "Allow LAN" so the user
+/// knows what address *other* devices should use — connecting to
+/// `127.0.0.1` from another machine obviously wouldn't reach anything.
+/// Uses the classic no-packets-sent UDP "connect" trick (it only performs a
+/// routing-table lookup; nothing is actually transmitted) rather than
+/// pulling in a network-interface-enumeration crate for one string.
+#[tauri::command]
+pub fn get_lan_ip() -> Option<String> {
+    use std::net::UdpSocket;
+    let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
+    socket.connect("1.1.1.1:80").ok()?;
+    socket.local_addr().ok().map(|addr| addr.ip().to_string())
+}
+
 /// `launch_on_startup` isn't part of `AppSettings` — it's read live from the
 /// autostart plugin (the actual OS registration), not our own store. See
 /// settings.rs's doc-comment on why the two are kept separate.
