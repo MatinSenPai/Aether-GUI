@@ -13,6 +13,7 @@ import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
 import { NoizeProfileToggle } from "@/components/NoizeProfileToggle";
 import { BindAddressField } from "@/components/BindAddressField";
+import { TunToggle } from "@/components/TunToggle";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -117,6 +118,8 @@ export function AdvancedPanel() {
             >
               <BindAddressField />
             </FieldRow>
+
+            <TunToggle />
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">

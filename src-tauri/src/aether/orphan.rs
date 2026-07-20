@@ -49,8 +49,11 @@ fn kill_pid(pid: u32) {
 
 #[cfg(windows)]
 fn is_alive(pid: u32) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     std::process::Command::new("tasklist")
         .args(["/FI", &format!("PID eq {pid}")])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
         .unwrap_or(false)
@@ -58,7 +61,10 @@ fn is_alive(pid: u32) -> bool {
 
 #[cfg(windows)]
 fn kill_pid(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
     let _ = std::process::Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
         .status();
 }

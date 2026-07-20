@@ -134,6 +134,9 @@ pub struct ConnectionProfile {
     /// 127.0.0.1:1819; users can change the port or bind to 0.0.0.0 for LAN.
     #[serde(default = "default_bind_address")]
     pub bind_address: String,
+    /// Persist the user's TUN toggle across app restarts.
+    #[serde(default)]
+    pub tun_enabled: bool,
 }
 
 fn default_true() -> bool {
@@ -272,6 +275,7 @@ impl Default for ConnectionProfile {
             masque_noize: MasqueNoize::Firewall,
             wg_noize: WgNoize::Balanced,
             bind_address: default_bind_address(),
+            tun_enabled: false,
         }
     }
 }

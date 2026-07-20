@@ -15,6 +15,7 @@ function phaseOf(status: ConnectionStatus): Phase {
     case "Disconnecting":
       return "connecting";
     case "Connected":
+    case "Tunneling":
       return "connected";
     case "Error":
       return "error";
