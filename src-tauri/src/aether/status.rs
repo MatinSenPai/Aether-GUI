@@ -18,15 +18,17 @@ pub fn port_is_live() -> bool {
 }
 
 /// Aether's own route-discovery budget varies by scan mode and obfuscation
-/// profile — heavier obfuscation adds decoy traffic and inter-packet delays,
-/// stretching every scan. The GUI's timeout must exceed the expected budget
-/// or it would kill Aether while it's still legitimately scanning.
+/// profile — ironclad opens a real tunnel through every candidate and heavier
+/// noize profiles add decoy traffic and inter-packet delays, both stretching
+/// the scan. The GUI's timeout must exceed the expected budget or it would
+/// kill Aether while it's still legitimately scanning.
 pub fn connect_timeout(scan_mode: &ScanMode, protocol: &Protocol, masque_noize: &MasqueNoize, wg_noize: &WgNoize) -> Duration {
     let base = match scan_mode {
         ScanMode::Turbo => 60u64,
         ScanMode::Balanced => 150,
         ScanMode::Thorough => 180,
         ScanMode::Stealth => 180,
+        ScanMode::Ironclad => 240,
     };
     // Heavier obfuscation profiles pad handshakes and add inter-packet
     // delays, so scans take longer. Add a percentage on top of the base.

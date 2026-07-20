@@ -4,7 +4,7 @@
 # Run this before `tauri dev` / `tauri build` (wire into CI for each target).
 set -euo pipefail
 
-AETHER_VERSION="v1.2.0"
+AETHER_VERSION="v1.3.0"
 REPO="CluvexStudio/Aether"
 DEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

@@ -8,6 +8,7 @@ const LABELS: Record<ScanMode, string> = {
   balanced: "Balanced",
   thorough: "Thorough",
   stealth: "Stealth",
+  ironclad: "Ironclad",
 };
 
 const DESCRIPTIONS: Record<ScanMode, string> = {
@@ -16,6 +17,8 @@ const DESCRIPTIONS: Record<ScanMode, string> = {
   balanced: "Good default — reasonable speed without excessive probing.",
   thorough: "Slower, more exhaustive search for working routes.",
   stealth: "Slowest and most cautious — hardest for a censor to fingerprint.",
+  ironclad:
+    "Opens a real tunnel through each candidate and sends a real HTTP request before trusting it. Slowest, but guarantees the gateway actually works.",
 };
 
 /** Locked outside Idle/Error, mirroring ProtocolSelect — scan mode can't
