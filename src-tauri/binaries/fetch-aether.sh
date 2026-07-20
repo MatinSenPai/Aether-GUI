@@ -16,6 +16,10 @@ case "$(uname -s)-$(uname -m)" in
   *) echo "Unsupported platform: $(uname -s)-$(uname -m). For Windows, download aether-windows-x86_64.zip manually into $DEST_DIR/aether.exe" >&2; exit 1 ;;
 esac
 
+# CI override: when cross-building (e.g. the Intel-mac app on an arm64
+# runner), the bundled core must match the app's target arch, not the host's.
+ASSET="${AETHER_ASSET:-$ASSET}"
+
 URL="https://github.com/${REPO}/releases/download/${AETHER_VERSION}/${ASSET}"
 SUMS_URL="https://github.com/${REPO}/releases/download/${AETHER_VERSION}/SHA256SUMS.txt"
 

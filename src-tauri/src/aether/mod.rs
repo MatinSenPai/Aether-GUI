@@ -57,6 +57,13 @@ fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
     if !path.exists() {
         return Err(AetherError::BinaryMissing(path.display().to_string()));
     }
+    // Bundlers don't reliably preserve the exec bit on resource files, and a
+    // non-executable core binary would fail every spawn with a cryptic error.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
+    }
     Ok(path)
 }
 
