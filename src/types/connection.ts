@@ -6,6 +6,7 @@ export type ConnectionStatus =
   | { state: "Launching" }
   | { state: "Connecting" }
   | { state: "Connected"; socks_addr: string; connected_at_ms: number }
+  | { state: "Tunneling"; tun_addr: string; socks_addr: string; connected_at_ms: number }
   | { state: "Reconnecting"; attempt: number; max_attempts: number }
   | { state: "Disconnecting" }
   | { state: "Error"; message: string; phase: string };
@@ -32,6 +33,8 @@ export interface ConnectionProfile {
   wg_noize: WgNoize;
   /** Local SOCKS5 listen address (--bind). Default 127.0.0.1:1819. */
   bind_address: string;
+  /** Whether the sing-box TUN toggle is enabled. */
+  tun_enabled: boolean;
 }
 
 export interface LogLine {

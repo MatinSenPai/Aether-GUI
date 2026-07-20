@@ -66,7 +66,9 @@ function ScanProgressBar({ percent }: { percent: number | null }) {
 export function ConnectionStatusLine() {
   const status = useConnectionStore((s) => s.status);
   const scanBudgetSecs = useConnectionStore((s) => s.scanBudgetSecs);
-  const connectedAt = status.state === "Connected" ? status.connected_at_ms : null;
+  const connectedAt = status.state === "Connected" || status.state === "Tunneling"
+    ? status.connected_at_ms
+    : null;
   const elapsed = useElapsed(connectedAt).formatted;
 
   // Route discovery can legitimately take up to ~2.5 minutes with nothing
@@ -121,6 +123,10 @@ export function ConnectionStatusLine() {
       break;
     case "Connected":
       primary = "Connected";
+      secondary = elapsed;
+      break;
+    case "Tunneling":
+      primary = "Tunnel active";
       secondary = elapsed;
       break;
     case "Disconnecting":

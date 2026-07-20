@@ -14,6 +14,12 @@ pub enum AetherError {
     NotConnected,
     #[error("internal error: {0}")]
     Internal(String),
+    #[error("sing-box binary not found at {0}")]
+    SingboxBinaryMissing(String),
+    #[error("sing-box is already running")]
+    SingboxAlreadyRunning,
+    #[error("failed to write sing-box config: {0}")]
+    SingboxConfigFailed(String),
 }
 
 // Tauri v2 command errors must be Serialize; Aether-GUI has no need to

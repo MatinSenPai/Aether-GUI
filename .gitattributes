@@ -1,0 +1,12 @@
+# Normalize all text files to LF on commit, auto-convert on checkout.
+* text=auto eol=lf
+
+# Keep Windows-specific scripts as CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files — don't touch.
+*.png binary
+*.jpg binary
+*.ico binary
