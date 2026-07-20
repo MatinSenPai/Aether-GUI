@@ -18,3 +18,6 @@ src-tauri/binaries/*.toml
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# CI-built bundles downloaded for local testing
+/ci-artifacts/
