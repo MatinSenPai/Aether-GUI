@@ -1,0 +1,97 @@
+name: build
+
+# Tauri can't cross-bundle from one OS to another, so each platform builds on
+# its own runner. Manual dispatch uploads the bundles as run artifacts (for
+# testing); pushing a v* tag additionally attaches them to a draft release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            target: ""
+            aether_asset: ""
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            aether_asset: ""
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            aether_asset: aether-macos-x86_64.tar.gz
+          - name: windows-x86_64
+            os: windows-latest
+            target: ""
+            aether_asset: ""
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Fetch Aether core (Linux/macOS)
+        if: runner.os != 'Windows'
+        env:
+          AETHER_ASSET: ${{ matrix.aether_asset }}
+        run: bash src-tauri/binaries/fetch-aether.sh
+
+      # fetch-aether.sh is unix-only (tar.gz assets); the Windows asset is a
+      # zip, fetched here with the same version pin and checksum verification.
+      - name: Fetch Aether core (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $pin = (Select-String -Path src-tauri/binaries/fetch-aether.sh -Pattern 'AETHER_VERSION="(.+)"').Matches[0].Groups[1].Value
+          $base = "https://github.com/CluvexStudio/Aether/releases/download/$pin"
+          curl.exe -sL -o aether.zip "$base/aether-windows-x86_64.zip"
+          curl.exe -sL -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
+          $expected = ((Get-Content SHA256SUMS.txt | Select-String 'aether-windows-x86_64.zip') -split '\s+')[0]
+          $actual = (Get-FileHash aether.zip -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $expected) { throw "Checksum mismatch: $actual != $expected" }
+          Expand-Archive aether.zip -DestinationPath aether-extract
+          Move-Item aether-extract/aether.exe src-tauri/binaries/aether.exe
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseDraft: true
+          args: ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.name }}
+          path: |
+            src-tauri/target/**/bundle/**/*.dmg
+            src-tauri/target/**/bundle/**/*.AppImage
+            src-tauri/target/**/bundle/**/*.deb
+            src-tauri/target/**/bundle/**/*.rpm
+            src-tauri/target/**/bundle/**/*setup.exe
+            src-tauri/target/**/bundle/**/*.msi
