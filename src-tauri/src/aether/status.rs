@@ -1,10 +1,21 @@
-use std::net::{SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
-pub const SOCKS_PORT: u16 = 1819;
+pub const DEFAULT_SOCKS_ADDR: &str = "127.0.0.1:1819";
 
-pub fn socks_addr() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], SOCKS_PORT))
+pub fn parse_bind_address(addr: &str) -> SocketAddr {
+    addr.parse().unwrap_or_else(|_| DEFAULT_SOCKS_ADDR.parse().unwrap())
+}
+
+/// Returns the address to TCP-connect to for liveness probes. When Aether
+/// listens on 0.0.0.0 (all interfaces), we must probe 127.0.0.1 instead —
+/// you can listen on the unspecified address but can't connect to it.
+fn probe_addr(listen: &SocketAddr) -> SocketAddr {
+    if listen.ip().is_unspecified() {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listen.port())
+    } else {
+        *listen
+    }
 }
 
 /// Ground-truth "are we connected" signal: try to open a TCP connection to
@@ -12,8 +23,8 @@ pub fn socks_addr() -> SocketAddr {
 /// wording across releases, which is the actual fragility PTY-automation
 /// accepts (see the approved plan) — log-line matching is only ever used to
 /// fail fast / show a nicer message, never as the sole source of truth.
-pub fn port_is_live() -> bool {
-    TcpStream::connect_timeout(&socks_addr(), Duration::from_millis(300)).is_ok()
+pub fn port_is_live(addr: &SocketAddr) -> bool {
+    TcpStream::connect_timeout(&probe_addr(addr), Duration::from_millis(300)).is_ok()
 }
 
 /// Empirically (manually running v1.0.1 to completion), Aether's own route-

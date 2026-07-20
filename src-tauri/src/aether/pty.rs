@@ -74,7 +74,7 @@ pub fn spawn(
     // prompts below normally never appear — read_loop's prompt answering is
     // kept as a fallback for output-format drift.
     for arg in profile.as_args() {
-        cmd.arg(arg);
+        cmd.arg(&arg);
     }
     // Env var, not a flag (see ConnectionProfile::masque_http2's doc-comment):
     // any value suppresses Aether 1.2.0's interactive "MASQUE transport"

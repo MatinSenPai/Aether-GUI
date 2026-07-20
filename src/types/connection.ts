@@ -24,6 +24,8 @@ export interface ConnectionProfile {
   /** Aether ≥1.2.0: run MASQUE over HTTP/2 (TCP) instead of the default
    * HTTP/3 (QUIC) — for networks that block or throttle UDP. */
   masque_http2: boolean;
+  /** Local SOCKS5 listen address (--bind). Default 127.0.0.1:1819. */
+  bind_address: string;
 }
 
 export interface LogLine {

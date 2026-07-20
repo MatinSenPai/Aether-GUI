@@ -62,11 +62,6 @@ impl IpVersion {
     }
 }
 
-/// Note: there is no `local_port` or `obfuscation_profile` field. Manually
-/// running Aether v1.0.1 end to end showed it only ever prompts for these
-/// three settings (protocol / scan mode / IP version) regardless of protocol
-/// choice — the local port is fixed at 1819 by Aether itself, and the
-/// obfuscation profile is auto-selected and merely logged, never prompted.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub protocol: Protocol,
@@ -84,10 +79,19 @@ pub struct ConnectionProfile {
     /// new interactive "MASQUE transport" prompt in both directions.
     #[serde(default)]
     pub masque_http2: bool,
+    /// Local SOCKS5 listen address (`--bind`). Aether defaults to
+    /// 127.0.0.1:1819; users can change the port to avoid conflicts or bind
+    /// to 0.0.0.0 to expose the proxy on the LAN.
+    #[serde(default = "default_bind_address")]
+    pub bind_address: String,
 }
 
 fn default_true() -> bool {
     true
+}
+
+fn default_bind_address() -> String {
+    "127.0.0.1:1819".into()
 }
 
 impl ConnectionProfile {
@@ -97,26 +101,30 @@ impl ConnectionProfile {
     /// ALWAYS passed: without either, 1.1.1 asks its own interactive
     /// "reconnect with last gateway?" question, which the GUI must never
     /// leave unanswered.
-    pub fn as_args(&self) -> Vec<&'static str> {
-        let mut args = Vec::with_capacity(4);
+    pub fn as_args(&self) -> Vec<String> {
+        let mut args = Vec::with_capacity(6);
         match self.protocol {
             Protocol::Auto => {} // Aether's own default (MASQUE)
-            Protocol::Masque => args.push("--masque"),
-            Protocol::Wireguard => args.push("--wg"),
-            Protocol::Gool => args.push("--gool"),
+            Protocol::Masque => args.push("--masque".into()),
+            Protocol::Wireguard => args.push("--wg".into()),
+            Protocol::Gool => args.push("--gool".into()),
         }
         args.push(match self.scan_mode {
-            ScanMode::Turbo => "--turbo",
-            ScanMode::Balanced => "--balanced",
-            ScanMode::Thorough => "--thorough",
-            ScanMode::Stealth => "--stealth",
+            ScanMode::Turbo => "--turbo".into(),
+            ScanMode::Balanced => "--balanced".into(),
+            ScanMode::Thorough => "--thorough".into(),
+            ScanMode::Stealth => "--stealth".into(),
         });
         args.push(match self.ip_version {
-            IpVersion::V4 => "-4",
-            IpVersion::V6 => "-6",
-            IpVersion::Both => "--dual",
+            IpVersion::V4 => "-4".into(),
+            IpVersion::V6 => "-6".into(),
+            IpVersion::Both => "--dual".into(),
         });
-        args.push(if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" });
+        args.push(if self.quick_reconnect { "--quick-reconnect".into() } else { "--no-quick-reconnect".into() });
+        if self.bind_address != default_bind_address() {
+            args.push("--bind".into());
+            args.push(self.bind_address.clone());
+        }
         args
     }
 }
@@ -130,6 +138,7 @@ impl Default for ConnectionProfile {
             ip_version: IpVersion::V4,
             quick_reconnect: true,
             masque_http2: false,
+            bind_address: default_bind_address(),
         }
     }
 }

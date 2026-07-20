@@ -26,6 +26,7 @@ interface ConnectionState {
   setIpVersion: (ip_version: ConnectionProfile["ip_version"]) => void;
   setQuickReconnect: (quick_reconnect: boolean) => void;
   setMasqueHttp2: (masque_http2: boolean) => void;
+  setBindAddress: (bind_address: string) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -37,6 +38,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     ip_version: "v4",
     quick_reconnect: true,
     masque_http2: false,
+    bind_address: "127.0.0.1:1819",
   },
   logs: [],
   sidecarError: null,
@@ -82,6 +84,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setMasqueHttp2: (masque_http2) =>
     set((s) => ({ profile: { ...s.profile, masque_http2 } })),
+
+  setBindAddress: (bind_address) =>
+    set((s) => ({ profile: { ...s.profile, bind_address } })),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set

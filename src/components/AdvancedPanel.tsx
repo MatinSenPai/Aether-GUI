@@ -11,6 +11,7 @@ import { ProtocolSelect } from "@/components/ProtocolSelect";
 import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
+import { BindAddressField } from "@/components/BindAddressField";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -102,6 +103,12 @@ export function AdvancedPanel() {
               tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
             >
               <MasqueTransportToggle />
+            </FieldRow>
+            <FieldRow
+              label="SOCKS5 Proxy"
+              tooltip="The local address Aether's SOCKS5 proxy listens on. Change the port to avoid conflicts, or enable LAN to share the tunnel with other devices on your network."
+            >
+              <BindAddressField />
             </FieldRow>
 
             <div className="flex items-center justify-between">
