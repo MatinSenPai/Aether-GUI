@@ -1,20 +1,25 @@
 use super::profiles::{MasqueNoize, Protocol, ScanMode, WgNoize};
-use std::net::{SocketAddr, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
-pub const SOCKS_PORT: u16 = 1819;
+pub const DEFAULT_SOCKS_ADDR: &str = "127.0.0.1:1819";
 
-pub fn socks_addr() -> SocketAddr {
-    SocketAddr::from(([127, 0, 0, 1], SOCKS_PORT))
+pub fn parse_bind_address(addr: &str) -> SocketAddr {
+    addr.parse().unwrap_or_else(|_| DEFAULT_SOCKS_ADDR.parse().unwrap())
 }
 
-/// Ground-truth "are we connected" signal: try to open a TCP connection to
-/// Aether's local SOCKS5 port. This is immune to Aether changing its log
-/// wording across releases, which is the actual fragility PTY-automation
-/// accepts (see the approved plan) — log-line matching is only ever used to
-/// fail fast / show a nicer message, never as the sole source of truth.
-pub fn port_is_live() -> bool {
-    TcpStream::connect_timeout(&socks_addr(), Duration::from_millis(300)).is_ok()
+/// When Aether listens on 0.0.0.0, we probe 127.0.0.1 instead.
+fn probe_addr(listen: &SocketAddr) -> SocketAddr {
+    if listen.ip().is_unspecified() {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listen.port())
+    } else {
+        *listen
+    }
+}
+
+/// Ground-truth "are we connected" signal: TCP connect to SOCKS5 port.
+pub fn port_is_live(addr: &SocketAddr) -> bool {
+    TcpStream::connect_timeout(&probe_addr(addr), Duration::from_millis(300)).is_ok()
 }
 
 /// Aether's own route-discovery budget varies by scan mode and obfuscation
@@ -67,3 +72,64 @@ pub const GRACEFUL_SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 pub const MAX_AUTO_RETRIES: u32 = 3;
 pub const RETRY_BACKOFF: [Duration; MAX_AUTO_RETRIES as usize] =
     [Duration::from_secs(2), Duration::from_secs(5), Duration::from_secs(10)];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{TcpListener, TcpStream};
+    use std::thread;
+
+    #[test]
+    fn parse_valid_and_invalid() {
+        assert_eq!(parse_bind_address("127.0.0.1:1919"), "127.0.0.1:1919".parse().unwrap());
+        assert_eq!(parse_bind_address("0.0.0.0:1819"), "0.0.0.0:1819".parse().unwrap());
+        assert_eq!(parse_bind_address("0.0.0.0:9999"), "0.0.0.0:9999".parse().unwrap());
+        assert_eq!(parse_bind_address("127.0.0.1:"), DEFAULT_SOCKS_ADDR.parse().unwrap());
+        assert_eq!(parse_bind_address("not-an-addr"), DEFAULT_SOCKS_ADDR.parse().unwrap());
+    }
+
+    #[test]
+    fn probe_addr_rewrites_unspecified() {
+        let any: SocketAddr = "0.0.0.0:1919".parse().unwrap();
+        assert_eq!(probe_addr(&any), "127.0.0.1:1919".parse().unwrap());
+        let loopback: SocketAddr = "127.0.0.1:1919".parse().unwrap();
+        assert_eq!(probe_addr(&loopback), loopback);
+    }
+
+    #[test]
+    fn port_is_live_detects_listener() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        thread::spawn(move || { let _ = listener.accept(); });
+        assert!(port_is_live(&addr));
+        let dead: SocketAddr = format!("127.0.0.1:{}", addr.port().wrapping_add(1).max(20000)).parse().unwrap();
+        if TcpStream::connect_timeout(&dead, Duration::from_millis(50)).is_err() {
+            assert!(!port_is_live(&dead));
+        }
+    }
+
+    #[test]
+    fn port_is_live_probes_loopback_when_bound_any() {
+        let listener = TcpListener::bind("0.0.0.0:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        thread::spawn(move || { let _ = listener.accept(); });
+        let any = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), addr.port());
+        assert!(port_is_live(&any), "should probe 127.0.0.1 when listen is 0.0.0.0");
+    }
+
+    #[test]
+    fn connect_timeout_ironclad() {
+        assert_eq!(
+            connect_timeout(&ScanMode::Ironclad, &Protocol::Masque, &MasqueNoize::Firewall, &WgNoize::Balanced),
+            Duration::from_secs(240)
+        );
+    }
+
+    #[test]
+    fn connect_timeout_gfw_adds_25pct() {
+        assert_eq!(
+            connect_timeout(&ScanMode::Balanced, &Protocol::Masque, &MasqueNoize::Gfw, &WgNoize::Balanced),
+            Duration::from_secs(150 + 150 * 25 / 100)
+        );
+    }
+}

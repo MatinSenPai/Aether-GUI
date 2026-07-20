@@ -1,6 +1,7 @@
 use crate::aether::{self, profiles::ConnectionProfile};
 use crate::error::AetherError;
 use crate::state::{AppState, ConnectionState};
+use crate::tray;
 use tauri::{AppHandle, State};
 
 #[tauri::command]
@@ -31,4 +32,14 @@ pub fn get_default_profile(app: AppHandle) -> ConnectionProfile {
 pub fn set_default_profile(app: AppHandle, profile: ConnectionProfile) -> Result<(), AetherError> {
     aether::profiles::save(&app, &profile);
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_close_to_tray() -> bool {
+    tray::get_close_to_tray()
+}
+
+#[tauri::command]
+pub fn set_close_to_tray(app: AppHandle, enabled: bool) {
+    tray::set_close_to_tray(&app, enabled);
 }

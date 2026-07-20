@@ -130,6 +130,10 @@ pub struct ConnectionProfile {
     /// Only sent when the active protocol is WireGuard or gool.
     #[serde(default = "default_wg_noize")]
     pub wg_noize: WgNoize,
+    /// Local SOCKS5 listen address (`--bind`). Aether defaults to
+    /// 127.0.0.1:1819; users can change the port or bind to 0.0.0.0 for LAN.
+    #[serde(default = "default_bind_address")]
+    pub bind_address: String,
 }
 
 fn default_true() -> bool {
@@ -144,6 +148,10 @@ fn default_wg_noize() -> WgNoize {
     WgNoize::Balanced
 }
 
+fn default_bind_address() -> String {
+    "127.0.0.1:1819".into()
+}
+
 impl ConnectionProfile {
     /// CLI flags for Aether ≥1.1.1 — the whole profile is passed up front so
     /// the interactive prompts never appear (the PTY prompt-answering in
@@ -151,35 +159,104 @@ impl ConnectionProfile {
     /// ALWAYS passed: without either, 1.1.1 asks its own interactive
     /// "reconnect with last gateway?" question, which the GUI must never
     /// leave unanswered.
-    pub fn as_args(&self) -> Vec<&'static str> {
-        let mut args = Vec::with_capacity(6);
+    pub fn as_args(&self) -> Vec<String> {
+        let mut args = Vec::with_capacity(10);
         match self.protocol {
-            Protocol::Auto => {} // Aether's own default (MASQUE)
-            Protocol::Masque => args.push("--masque"),
-            Protocol::Wireguard => args.push("--wg"),
-            Protocol::Gool => args.push("--gool"),
+            Protocol::Auto => {}
+            Protocol::Masque => args.push("--masque".into()),
+            Protocol::Wireguard => args.push("--wg".into()),
+            Protocol::Gool => args.push("--gool".into()),
         }
         args.push(match self.scan_mode {
-            ScanMode::Turbo => "--turbo",
-            ScanMode::Balanced => "--balanced",
-            ScanMode::Thorough => "--thorough",
-            ScanMode::Stealth => "--stealth",
-            ScanMode::Ironclad => "--ironclad",
+            ScanMode::Turbo => "--turbo".into(),
+            ScanMode::Balanced => "--balanced".into(),
+            ScanMode::Thorough => "--thorough".into(),
+            ScanMode::Stealth => "--stealth".into(),
+            ScanMode::Ironclad => "--ironclad".into(),
         });
         args.push(match self.ip_version {
-            IpVersion::V4 => "-4",
-            IpVersion::V6 => "-6",
-            IpVersion::Both => "--dual",
+            IpVersion::V4 => "-4".into(),
+            IpVersion::V6 => "-6".into(),
+            IpVersion::Both => "--dual".into(),
         });
-        args.push(if self.quick_reconnect { "--quick-reconnect" } else { "--no-quick-reconnect" });
+        args.push(if self.quick_reconnect { "--quick-reconnect".into() } else { "--no-quick-reconnect".into() });
         // Noize profile — pick the value matching the active protocol family.
-        // Auto resolves to MASQUE, so it uses the MASQUE noize set.
-        args.push("--noize");
+        args.push("--noize".into());
         args.push(match self.protocol {
             Protocol::Auto | Protocol::Masque => self.masque_noize.as_flag(),
             Protocol::Wireguard | Protocol::Gool => self.wg_noize.as_flag(),
-        });
+        }.into());
+        // Only forward --bind when non-default and parseable.
+        if self.bind_address != default_bind_address()
+            && self.bind_address.parse::<std::net::SocketAddr>().is_ok()
+        {
+            args.push("--bind".into());
+            args.push(self.bind_address.clone());
+        }
         args
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_omits_bind_flag() {
+        let p = ConnectionProfile::default();
+        let args = p.as_args();
+        assert!(!args.iter().any(|a| a == "--bind"), "args={args:?}");
+    }
+
+    #[test]
+    fn custom_port_emits_bind() {
+        let mut p = ConnectionProfile::default();
+        p.bind_address = "127.0.0.1:1919".into();
+        let args = p.as_args();
+        let i = args.iter().position(|a| a == "--bind").expect("missing --bind");
+        assert_eq!(args.get(i + 1).map(String::as_str), Some("127.0.0.1:1919"));
+    }
+
+    #[test]
+    fn lan_bind_emits_bind() {
+        let mut p = ConnectionProfile::default();
+        p.bind_address = "0.0.0.0:1819".into();
+        let args = p.as_args();
+        let i = args.iter().position(|a| a == "--bind").expect("missing --bind");
+        assert_eq!(args.get(i + 1).map(String::as_str), Some("0.0.0.0:1819"));
+    }
+
+    #[test]
+    fn lan_with_custom_port_emits_bind() {
+        let mut p = ConnectionProfile::default();
+        p.bind_address = "0.0.0.0:9999".into();
+        let args = p.as_args();
+        let i = args.iter().position(|a| a == "--bind").expect("missing --bind");
+        assert_eq!(args.get(i + 1).map(String::as_str), Some("0.0.0.0:9999"));
+    }
+
+    #[test]
+    fn invalid_bind_is_not_forwarded() {
+        let mut p = ConnectionProfile::default();
+        p.bind_address = "127.0.0.1:".into();
+        let args = p.as_args();
+        assert!(!args.iter().any(|a| a == "--bind"), "args={args:?}");
+    }
+
+    #[test]
+    fn old_profile_json_gets_defaults() {
+        let json = r#"{"protocol":"auto","scan_mode":"balanced","ip_version":"v4","quick_reconnect":true,"masque_http2":false}"#;
+        let p: ConnectionProfile = serde_json::from_str(json).unwrap();
+        assert_eq!(p.bind_address, "127.0.0.1:1819");
+        assert_eq!(p.masque_noize, MasqueNoize::Firewall);
+    }
+
+    #[test]
+    fn default_emits_noize() {
+        let p = ConnectionProfile::default();
+        let args = p.as_args();
+        let i = args.iter().position(|a| a == "--noize").expect("missing --noize");
+        assert_eq!(args.get(i + 1).map(String::as_str), Some("firewall"));
     }
 }
 
@@ -194,6 +271,7 @@ impl Default for ConnectionProfile {
             masque_http2: false,
             masque_noize: MasqueNoize::Firewall,
             wg_noize: WgNoize::Balanced,
+            bind_address: default_bind_address(),
         }
     }
 }

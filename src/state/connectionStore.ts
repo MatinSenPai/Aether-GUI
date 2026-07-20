@@ -30,6 +30,7 @@ interface ConnectionState {
   setMasqueHttp2: (masque_http2: boolean) => void;
   setMasqueNoize: (masque_noize: MasqueNoize) => void;
   setWgNoize: (wg_noize: WgNoize) => void;
+  setBindAddress: (bind_address: string) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -43,6 +44,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     masque_http2: false,
     masque_noize: "firewall",
     wg_noize: "balanced",
+    bind_address: "127.0.0.1:1819",
   },
   logs: [],
   sidecarError: null,
@@ -94,6 +96,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setWgNoize: (wg_noize) =>
     set((s) => ({ profile: { ...s.profile, wg_noize } })),
+
+  setBindAddress: (bind_address) =>
+    set((s) => ({ profile: { ...s.profile, bind_address } })),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set

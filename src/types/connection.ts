@@ -30,6 +30,8 @@ export interface ConnectionProfile {
   masque_noize: MasqueNoize;
   /** Obfuscation profile for WireGuard/gool (balanced/aggressive/light/off). */
   wg_noize: WgNoize;
+  /** Local SOCKS5 listen address (--bind). Default 127.0.0.1:1819. */
+  bind_address: string;
 }
 
 export interface LogLine {
