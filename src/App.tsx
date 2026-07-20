@@ -3,6 +3,7 @@ import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { ConnectButton } from "@/components/ConnectButton";
 import { ConnectionStatusLine } from "@/components/ConnectionStatusLine";
 import { AdvancedPanel } from "@/components/AdvancedPanel";
+import { CloseToTrayToggle } from "@/components/CloseToTrayToggle";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,6 +25,7 @@ function MainScreen() {
         <ConnectionStatusLine />
       </div>
       <AdvancedPanel />
+      <CloseToTrayToggle />
     </div>
   );
 }

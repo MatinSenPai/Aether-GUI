@@ -6,9 +6,10 @@ mod error;
 mod events;
 mod focus;
 mod state;
+mod tray;
 
 use state::AppState;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 
 fn main() {
     tauri::Builder::default()
@@ -22,6 +23,7 @@ fn main() {
             // same port.
             aether::orphan::reap_orphan(&data_dir);
             focus::spawn_watcher(app.handle().clone());
+            tray::init(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -30,7 +32,17 @@ fn main() {
             commands::get_status,
             commands::get_default_profile,
             commands::set_default_profile,
+            commands::get_close_to_tray,
+            commands::set_close_to_tray,
         ])
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                if tray::get_close_to_tray() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .build(tauri::generate_context!())
         .expect("error building tauri application")
         .run(|app_handle, event| {

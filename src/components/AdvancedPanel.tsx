@@ -12,6 +12,7 @@ import { ScanModeToggle } from "@/components/ScanModeToggle";
 import { IpVersionToggle } from "@/components/IpVersionToggle";
 import { MasqueTransportToggle } from "@/components/MasqueTransportToggle";
 import { NoizeProfileToggle } from "@/components/NoizeProfileToggle";
+import { BindAddressField } from "@/components/BindAddressField";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -109,6 +110,12 @@ export function AdvancedPanel() {
               tooltip="Disguises the handshake so DPI can't fingerprint the protocol. Heavier profiles send more decoy traffic — try escalating if the default doesn't connect. Options change based on the selected protocol."
             >
               <NoizeProfileToggle />
+            </FieldRow>
+            <FieldRow
+              label="SOCKS5 Proxy"
+              tooltip="The local address Aether's SOCKS5 proxy listens on. Change the port to avoid conflicts, or enable LAN to share the tunnel with other devices on your network."
+            >
+              <BindAddressField />
             </FieldRow>
 
             <div className="flex items-center justify-between">
