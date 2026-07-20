@@ -10,7 +10,8 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "fetch:binaries": "bash src-tauri/binaries/fetch-aether.sh && bash src-tauri/binaries/fetch-singbox.sh"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

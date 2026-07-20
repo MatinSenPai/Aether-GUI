@@ -14,6 +14,7 @@ const MAX_LOG_LINES = 500;
 interface ConnectionState {
   status: ConnectionStatus;
   profile: ConnectionProfile;
+  tunEnabled: boolean;
   logs: LogLine[];
   sidecarError: string | null;
   /** Aether's own route-probe budget in seconds, parsed live out of its log
@@ -31,6 +32,7 @@ interface ConnectionState {
   setMasqueNoize: (masque_noize: MasqueNoize) => void;
   setWgNoize: (wg_noize: WgNoize) => void;
   setBindAddress: (bind_address: string) => void;
+  setTunEnabled: (enabled: boolean) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -45,14 +47,19 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     masque_noize: "firewall",
     wg_noize: "balanced",
     bind_address: "127.0.0.1:1819",
+    tun_enabled: false,
   },
+  tunEnabled: false,
   logs: [],
   sidecarError: null,
   scanBudgetSecs: null,
 
   connect: async () => {
     try {
-      await invoke("connect", { profileOverride: get().profile });
+      await invoke("connect", {
+        profileOverride: get().profile,
+        enableTun: get().tunEnabled,
+      });
     } catch (e) {
       const message = String(e);
       // "Binary not found" (src-tauri/src/aether/mod.rs::resolve_binary) means
@@ -99,6 +106,29 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setBindAddress: (bind_address) =>
     set((s) => ({ profile: { ...s.profile, bind_address } })),
+
+  setTunEnabled: async (tunEnabled) => {
+    set({ tunEnabled });
+    if (tunEnabled) {
+      const profile = get().profile;
+      try {
+        await invoke("set_default_profile", {
+          profile: { ...profile, tun_enabled: true },
+        });
+      } catch (e) {
+        console.error("Failed to save TUN preference:", e);
+      }
+      try {
+        await invoke("elevate");
+      } catch {
+        set({ tunEnabled: false });
+        const p = get().profile;
+        invoke("set_default_profile", {
+          profile: { ...p, tun_enabled: false },
+        }).catch(() => {});
+      }
+    }
+  },
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
@@ -161,7 +191,18 @@ export async function initConnectionListeners(): Promise<() => void> {
       invoke<ConnectionStatus>("get_status"),
       invoke<ConnectionProfile>("get_default_profile"),
     ]);
-    useConnectionStore.setState({ status, profile });
+    useConnectionStore.setState({ status, profile, tunEnabled: profile.tun_enabled });
+    // If the saved profile has TUN enabled, elevate to admin so sing-box
+    // can create the virtual network adapter.
+    if (profile.tun_enabled) {
+      invoke("elevate").catch(() => {
+        // UAC denied — revert TUN and persist the change.
+        useConnectionStore.setState({ tunEnabled: false });
+        invoke("set_default_profile", {
+          profile: { ...profile, tun_enabled: false },
+        }).catch(() => {});
+      });
+    }
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }
