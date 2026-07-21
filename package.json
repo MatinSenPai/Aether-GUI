@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "verify:bundled-aether": "node scripts/verify-bundled-aether.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
