@@ -58,21 +58,10 @@ jobs:
           AETHER_ASSET: ${{ matrix.aether_asset }}
         run: bash src-tauri/binaries/fetch-aether.sh
 
-      # fetch-aether.sh is unix-only (tar.gz assets); the Windows asset is a
-      # zip, fetched here with the same version pin and checksum verification.
       - name: Fetch Aether core (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $pin = (Select-String -Path src-tauri/binaries/fetch-aether.sh -Pattern 'AETHER_VERSION="(.+)"').Matches[0].Groups[1].Value
-          $base = "https://github.com/CluvexStudio/Aether/releases/download/$pin"
-          curl.exe -sL -o aether.zip "$base/aether-windows-x86_64.zip"
-          curl.exe -sL -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
-          $expected = ((Get-Content SHA256SUMS.txt | Select-String 'aether-windows-x86_64.zip') -split '\s+')[0]
-          $actual = (Get-FileHash aether.zip -Algorithm SHA256).Hash.ToLower()
-          if ($actual -ne $expected) { throw "Checksum mismatch: $actual != $expected" }
-          Expand-Archive aether.zip -DestinationPath aether-extract
-          Move-Item aether-extract/aether.exe src-tauri/binaries/aether.exe
+        run: ./src-tauri/binaries/fetch-aether.ps1
 
       - run: npm ci
 
