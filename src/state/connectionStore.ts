@@ -61,8 +61,10 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       // SidecarErrorScreen instead of the button's own error state.
       if (message.toLowerCase().includes("binary not found")) {
         set({ sidecarError: message });
+        appendRuntimeLog(`[error:core] ${message}`);
       } else {
         set({ status: { state: "Error", message, phase: "launching" } });
+        appendRuntimeLog(`[error:launching] ${message}`);
       }
     }
   },
@@ -106,6 +108,15 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   retryAfterSidecarError: () => set({ sidecarError: null }),
 }));
 
+function appendRuntimeLog(line: string): void {
+  useConnectionStore.setState((state) => {
+    if (state.logs.at(-1)?.line === line) return state;
+    return {
+      logs: [...state.logs, { line, timestamp: Date.now() }].slice(-MAX_LOG_LINES),
+    };
+  });
+}
+
 // Dev-only: lets the 3D backdrop's per-state moods be driven from the WebView2
 // devtools console without a live tunnel, e.g.
 //   __conn.setState({ status: { state: "Connecting" } })
@@ -145,6 +156,9 @@ export async function initConnectionListeners(): Promise<() => void> {
         // Fresh attempt — last attempt's budget no longer applies.
         ...(e.payload.state === "Launching" ? { scanBudgetSecs: null } : {}),
       });
+      if (e.payload.state === "Error") {
+        appendRuntimeLog(`[error:${e.payload.phase}] ${e.payload.message}`);
+      }
     }),
     listen<LogLine>("aether://log", (e) => {
       pendingLogs.push(e.payload);
@@ -162,6 +176,9 @@ export async function initConnectionListeners(): Promise<() => void> {
       invoke<ConnectionProfile>("get_default_profile"),
     ]);
     useConnectionStore.setState({ status, profile });
+    if (status.state === "Error") {
+      appendRuntimeLog(`[error:${status.phase}] ${status.message}`);
+    }
   } catch (e) {
     console.error("Failed to load initial connection state:", e);
   }
