@@ -7,6 +7,7 @@ pub mod status;
 use crate::error::AetherError;
 use crate::events::{now_millis, LogEvent, LOG_EVENT, STATUS_EVENT};
 use crate::state::ConnectionState;
+use crate::tray;
 use profiles::ConnectionProfile;
 use pty::PtySession;
 use std::path::{Path, PathBuf};
@@ -69,6 +70,7 @@ fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
 
 fn set_state_and_emit(app: &AppHandle, manager: &Arc<Mutex<AetherManager>>, new_state: ConnectionState) {
     manager.lock().unwrap().state = new_state.clone();
+    tray::set_visual_state(app, &new_state);
     let _ = app.emit(STATUS_EVENT, &new_state);
 }
 
@@ -111,6 +113,7 @@ pub fn start_connect(
         // independent of whatever happened on a previous, unrelated attempt.
         mgr.retry_count = 0;
     }
+    tray::set_visual_state(&app, &ConnectionState::Launching);
     let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);
 
     spawn_and_monitor(app, manager, binary, data_dir, profile)
@@ -277,6 +280,7 @@ fn monitor_connect(
                 mgr.state = ConnectionState::Connecting;
                 let new_state = mgr.state.clone();
                 drop(mgr);
+                tray::set_visual_state(&app, &new_state);
                 let _ = app.emit(STATUS_EVENT, &new_state);
                 announced_connecting = true;
                 continue;
@@ -293,6 +297,7 @@ fn monitor_connect(
             // rather than inheriting whatever it took to get here.
             mgr.retry_count = 0;
             drop(mgr);
+            tray::set_visual_state(&app, &new_state);
             let _ = app.emit(STATUS_EVENT, &new_state);
             // Only persisted as "last successful" once actually proven to
             // work, never on a mere attempt (see profiles::save's doc-comment).
