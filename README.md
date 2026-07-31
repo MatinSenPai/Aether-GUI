@@ -56,13 +56,21 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 
 3. **Fetch the Aether binary**
 
-   Aether-GUI bundles the real `aether` binary from [CluvexStudio/Aether releases](https://github.com/CluvexStudio/Aether/releases) rather than building it — this repo only ships the GUI. Fetch and checksum-verify it for your platform:
+   Aether-GUI bundles the real `aether` binary from [CluvexStudio/Aether releases](https://github.com/CluvexStudio/Aether/releases) rather than building it — this repo only ships the GUI. Fetch and checksum-verify the pinned release for your platform:
+
+   Linux/macOS:
 
    ```sh
    ./src-tauri/binaries/fetch-aether.sh
    ```
 
-   This script covers Linux and macOS directly. On Windows, download the matching `aether-windows-*.zip` from the [Aether releases page](https://github.com/CluvexStudio/Aether/releases) yourself, verify it against the published `SHA256SUMS.txt`, and extract `aether.exe` into `src-tauri/binaries/`.
+   Windows PowerShell:
+
+   ```powershell
+   ./src-tauri/binaries/fetch-aether.ps1
+   ```
+
+   Both helpers verify the downloaded release asset against Aether's published `SHA256SUMS.txt` before placing the executable in `src-tauri/binaries/`.
 
 4. **Run in development mode**
 

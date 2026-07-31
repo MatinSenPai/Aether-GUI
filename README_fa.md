@@ -58,13 +58,21 @@
 
 ۳. **گرفتن فایل باینری Aether**
 
-   Aether-GUI فایل واقعیِ `aether` را از [ریلیزهای CluvexStudio/Aether](https://github.com/CluvexStudio/Aether/releases) کنار خودش قرار می‌دهد و خودش نمی‌سازدش — این مخزن فقط رابط گرافیکی است. برای سیستم‌عاملتان بگیریدش (با بررسی checksum):
+   Aether-GUI فایل واقعیِ `aether` را از [ریلیزهای CluvexStudio/Aether](https://github.com/CluvexStudio/Aether/releases) کنار خودش قرار می‌دهد و خودش نمی‌سازدش — این مخزن فقط رابط گرافیکی است. نسخه‌ی پین‌شده را برای سیستم‌عاملتان بگیرید و checksum آن را بررسی کنید:
+
+   لینوکس/macOS:
 
    ```sh
    ./src-tauri/binaries/fetch-aether.sh
    ```
 
-   این اسکریپت لینوکس و macOS را مستقیم پوشش می‌دهد. روی ویندوز، فایلِ `aether-windows-*.zip` مناسب را خودتان از [صفحه‌ی ریلیزهای Aether](https://github.com/CluvexStudio/Aether/releases) دانلود کنید، با `SHA256SUMS.txt` منتشرشده بررسی‌اش کنید و `aether.exe` را داخل `src-tauri/binaries/` استخراج کنید.
+   ویندوز PowerShell:
+
+   ```powershell
+   ./src-tauri/binaries/fetch-aether.ps1
+   ```
+
+   هر دو اسکریپت فایل دانلودشده را پیش از قرار دادن فایل اجرایی در `src-tauri/binaries/` با `SHA256SUMS.txt` منتشرشده‌ی Aether بررسی می‌کنند.
 
 ۴. **اجرا در حالت توسعه**
 
