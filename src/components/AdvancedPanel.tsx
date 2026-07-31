@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Info, Settings2, Copy, Check } from "lucide-react";
+import { ChevronDown, Info, Settings2, Copy, Check, Trash2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -58,6 +58,7 @@ function FieldRow({
  */
 export function AdvancedPanel() {
   const logs = useConnectionStore((s) => s.logs);
+  const clearLogs = useConnectionStore((s) => s.clearLogs);
   const status = useConnectionStore((s) => s.status);
   const quickReconnect = useConnectionStore((s) => s.profile.quick_reconnect);
   const setQuickReconnect = useConnectionStore((s) => s.setQuickReconnect);
@@ -166,17 +167,27 @@ export function AdvancedPanel() {
               <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 Logs
               </span>
-              <button
-                onClick={() => {
-                  const logText = logs.map(l => l.line).join('\n');
-                  navigator.clipboard.writeText(logText);
-                }}
-                className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground hover:text-foreground transition-colors uppercase cursor-pointer outline-none"
-                title="Copy all logs to clipboard"
-              >
-                <Copy size={12} />
-                Copy
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const logText = logs.map((l) => l.line).join("\n");
+                    navigator.clipboard.writeText(logText);
+                  }}
+                  className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground hover:text-foreground transition-colors uppercase cursor-pointer outline-none"
+                  title="Copy all logs to clipboard"
+                >
+                  <Copy size={12} />
+                  Copy
+                </button>
+                <button
+                  onClick={() => clearLogs()}
+                  className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground hover:text-destructive transition-colors uppercase cursor-pointer outline-none"
+                  title="Clear all logs"
+                >
+                  <Trash2 size={12} />
+                  Clear
+                </button>
+              </div>
               <div className="h-px flex-1 bg-border" />
             </div>
 

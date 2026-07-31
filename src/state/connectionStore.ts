@@ -46,6 +46,7 @@ interface ConnectionState {
   setRouteDirect: (route_direct: string) => void;
   setRoutesFile: (routes_file: string) => void;
   retryAfterSidecarError: () => void;
+  clearLogs: () => void;
 }
 
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
@@ -173,7 +174,12 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set
   // sidecarError if the binary is still missing.
-  retryAfterSidecarError: () => set({ sidecarError: null }),
+  retryAfterSidecarError: () => {
+    set({ sidecarError: null });
+  },
+  clearLogs: () => {
+    set({ logs: [] });
+  },
 }));
 
 // Dev-only: lets the 3D backdrop's per-state moods be driven from the WebView2
