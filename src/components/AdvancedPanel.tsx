@@ -15,6 +15,7 @@ import { NoizeProfileToggle } from "@/components/NoizeProfileToggle";
 import { BindAddressField } from "@/components/BindAddressField";
 import { ZeroTrustSettings } from "@/components/ZeroTrustSettings";
 import { RoutingSettings } from "@/components/RoutingSettings";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -130,6 +131,12 @@ export function AdvancedPanel() {
               tooltip="Optional Aether 1.5 controls for DNS inside the tunnel and rules that block a destination or send it directly outside the tunnel."
             >
               <RoutingSettings />
+            </FieldRow>
+            <FieldRow
+              label="App Theme"
+              tooltip="Customize the visual aesthetic and accent colors of the application."
+            >
+              <ThemeSelector />
             </FieldRow>
 
             <div className="flex items-center justify-between">
