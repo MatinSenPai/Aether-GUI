@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Info, Settings2 } from "lucide-react";
+import { ChevronDown, Info, Settings2, Copy, Check } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -15,6 +15,7 @@ import { NoizeProfileToggle } from "@/components/NoizeProfileToggle";
 import { BindAddressField } from "@/components/BindAddressField";
 import { ZeroTrustSettings } from "@/components/ZeroTrustSettings";
 import { RoutingSettings } from "@/components/RoutingSettings";
+import { ThemeSelector } from "@/components/ThemeSelector";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -131,6 +132,12 @@ export function AdvancedPanel() {
             >
               <RoutingSettings />
             </FieldRow>
+            <FieldRow
+              label="App Theme"
+              tooltip="Customize the visual aesthetic and accent colors of the application."
+            >
+              <ThemeSelector />
+            </FieldRow>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -159,6 +166,17 @@ export function AdvancedPanel() {
               <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 Logs
               </span>
+              <button
+                onClick={() => {
+                  const logText = logs.map(l => l.line).join('\n');
+                  navigator.clipboard.writeText(logText);
+                }}
+                className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground hover:text-foreground transition-colors uppercase cursor-pointer outline-none"
+                title="Copy all logs to clipboard"
+              >
+                <Copy size={12} />
+                Copy
+              </button>
               <div className="h-px flex-1 bg-border" />
             </div>
 

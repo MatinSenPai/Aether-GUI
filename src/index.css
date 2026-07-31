@@ -169,3 +169,39 @@
   .anim-ring-breathe, .anim-orb-a, .anim-orb-b { animation: none; }
 }
 
+/* Dynamic Themes */
+.theme-cyberpunk {
+    --primary: #fde047;
+    --primary-foreground: #0d0d0f;
+    --ring: #fde047;
+    --sidebar-primary: #fde047;
+    --sidebar-ring: #fde047;
+    --status-connecting: #fde047;
+}
+
+.theme-matrix {
+    --primary: #22c55e;
+    --primary-foreground: #0d0d0f;
+    --ring: #22c55e;
+    --sidebar-primary: #22c55e;
+    --sidebar-ring: #22c55e;
+    --status-connecting: #22c55e;
+}
+
+.theme-synthwave {
+    --primary: #f472b6;
+    --primary-foreground: #0d0d0f;
+    --ring: #f472b6;
+    --sidebar-primary: #f472b6;
+    --sidebar-ring: #f472b6;
+    --status-connecting: #f472b6;
+}
+
+.theme-ice {
+    --primary: #06b6d4;
+    --primary-foreground: #0d0d0f;
+    --ring: #06b6d4;
+    --sidebar-primary: #06b6d4;
+    --sidebar-ring: #06b6d4;
+    --status-connecting: #06b6d4;
+}
