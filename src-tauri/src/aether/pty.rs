@@ -316,14 +316,28 @@ fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\u{1b}' && chars.peek() == Some(&'[') {
-            chars.next();
-            for c2 in chars.by_ref() {
-                if c2.is_ascii_alphabetic() {
-                    break;
+        if c == '\u{1b}' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for c2 in chars.by_ref() {
+                    if c2.is_ascii_alphabetic() {
+                        break;
+                    }
                 }
+                continue;
+            } else if chars.peek() == Some(&']') {
+                chars.next();
+                while let Some(c2) = chars.next() {
+                    if c2 == '\x07' {
+                        break;
+                    }
+                    if c2 == '\u{1b}' && chars.peek() == Some(&'\\') {
+                        chars.next();
+                        break;
+                    }
+                }
+                continue;
             }
-            continue;
         }
         out.push(c);
     }

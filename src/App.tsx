@@ -10,6 +10,7 @@ import { AccessCodePrompt } from "@/components/AccessCodePrompt";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TitleBar } from "@/components/TitleBar";
 import { initConnectionListeners, useConnectionStore } from "@/state/connectionStore";
+import { useThemeStore } from "@/state/themeStore";
 
 const SCREEN_TRANSITION = {
   initial: { opacity: 0, y: 8 },
@@ -37,6 +38,14 @@ export function App() {
   const sidecarError = useConnectionStore((s) => s.sidecarError);
   const retryAfterSidecarError = useConnectionStore((s) => s.retryAfterSidecarError);
   const connect = useConnectionStore((s) => s.connect);
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    document.documentElement.classList.remove("theme-cyberpunk", "theme-matrix", "theme-synthwave", "theme-ice");
+    if (theme !== "default") {
+      document.documentElement.classList.add(`theme-${theme}`);
+    }
+  }, [theme]);
 
   useEffect(() => {
     const cleanup = initConnectionListeners();
