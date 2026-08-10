@@ -74,6 +74,9 @@ jobs:
           Expand-Archive aether.zip -DestinationPath aether-extract
           Move-Item aether-extract/aether.exe src-tauri/binaries/aether.exe
 
+      - name: Verify bundled Aether resource
+        run: node scripts/verify-bundled-aether.mjs
+
       - run: npm ci
 
       - uses: tauri-apps/tauri-action@v0
