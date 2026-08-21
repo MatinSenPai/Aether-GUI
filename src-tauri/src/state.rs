@@ -22,10 +22,19 @@ pub enum ConnectionState {
     /// `connected_at_ms` is an absolute UNIX-epoch timestamp (ms) rather than
     /// a pre-computed elapsed duration, so the frontend can render a live-
     /// updating session timer without needing another event from the backend.
-    Connected { socks_addr: String, connected_at_ms: u64 },
-    Reconnecting { attempt: u32, max_attempts: u32 },
+    Connected {
+        socks_addr: String,
+        connected_at_ms: u64,
+    },
+    Reconnecting {
+        attempt: u32,
+        max_attempts: u32,
+    },
     Disconnecting,
-    Error { message: String, phase: String },
+    Error {
+        message: String,
+        phase: String,
+    },
 }
 
 pub struct AppState {
