@@ -47,20 +47,68 @@ fn app_data_dir(app: &AppHandle) -> PathBuf {
         .unwrap_or_else(|_| std::env::temp_dir())
 }
 
-fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
-    let dir = app
-        .path()
-        .resource_dir()
-        .map_err(|e| AetherError::Internal(e.to_string()))?;
-    let name = if cfg!(windows) {
-        "aether.exe"
-    } else {
-        "aether"
+const BINARY_NAME: &str = if cfg!(windows) {
+    "aether.exe"
+} else {
+    "aether"
+};
+
+/// Windows canonicalization hands back `\\?\C:\…` extended-length paths. That
+/// prefix is meaningless to a user who just wants to know which folder to
+/// drop a file into, so it is stripped everywhere a path reaches the UI.
+fn display_path(path: &Path) -> String {
+    let s = path.display().to_string();
+    s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
+}
+
+/// Every place the core may legitimately live, in priority order.
+///
+/// The bundled resource directory is the normal answer — CI runs
+/// `binaries/fetch-aether.{sh,ps1}` so an installed build always has one
+/// there. The rest cover the cases that used to dead-end: a portable build
+/// run out of a folder the user dropped the core into, and a core already
+/// installed on PATH. Searching only the first location meant a user who had
+/// aether right next to the app was still told it was missing.
+fn binary_candidates(app: &AppHandle) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = Vec::new();
+    let mut push = |p: PathBuf| {
+        if !out.contains(&p) {
+            out.push(p);
+        }
     };
-    let path = dir.join("binaries").join(name);
-    if !path.exists() {
-        return Err(AetherError::BinaryMissing(path.display().to_string()));
+
+    if let Ok(dir) = app.path().resource_dir() {
+        push(dir.join("binaries").join(BINARY_NAME));
     }
+    if let Some(dir) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+    {
+        push(dir.join("binaries").join(BINARY_NAME));
+        push(dir.join(BINARY_NAME));
+    }
+    if let Some(paths) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&paths) {
+            push(dir.join(BINARY_NAME));
+        }
+    }
+    out
+}
+
+fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
+    let candidates = binary_candidates(app);
+    let Some(path) = candidates.iter().find(|p| p.is_file()).cloned() else {
+        // Only the first three are worth showing: the PATH entries are the
+        // user's own environment, and printing forty of them buries the one
+        // folder they actually need to create.
+        let listed = candidates
+            .iter()
+            .take(3)
+            .map(|p| display_path(p))
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(AetherError::BinaryMissing(listed));
+    };
     // Bundlers don't reliably preserve the exec bit on resource files, and a
     // non-executable core binary would fail every spawn with a cryptic error.
     #[cfg(unix)]

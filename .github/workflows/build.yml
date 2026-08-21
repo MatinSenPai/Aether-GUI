@@ -46,6 +46,11 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.name }}
+
       - name: Install Linux system dependencies
         if: runner.os == 'Linux'
         run: |
@@ -58,21 +63,29 @@ jobs:
           AETHER_ASSET: ${{ matrix.aether_asset }}
         run: bash src-tauri/binaries/fetch-aether.sh
 
-      # fetch-aether.sh is unix-only (tar.gz assets); the Windows asset is a
-      # zip, fetched here with the same version pin and checksum verification.
+      # The Windows asset is a zip rather than a tar.gz, so it has its own
+      # script. Both read src-tauri/binaries/AETHER_VERSION, and CI calls the
+      # same scripts a developer runs locally — an earlier version inlined the
+      # Windows fetch here, which is how a local Windows build could ship with
+      # no engine while CI looked green.
       - name: Fetch Aether core (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
+        run: ./src-tauri/binaries/fetch-aether.ps1
+
+      # A bundle with no engine in it still builds, installs and launches — it
+      # just can't ever connect, and the only way to find out is to run it.
+      # Fail here instead, where the reason is obvious.
+      - name: Verify the core is present before bundling
+        shell: bash
         run: |
-          $pin = (Select-String -Path src-tauri/binaries/fetch-aether.sh -Pattern 'AETHER_VERSION="(.+)"').Matches[0].Groups[1].Value
-          $base = "https://github.com/CluvexStudio/Aether/releases/download/$pin"
-          curl.exe -sL -o aether.zip "$base/aether-windows-x86_64.zip"
-          curl.exe -sL -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
-          $expected = ((Get-Content SHA256SUMS.txt | Select-String 'aether-windows-x86_64.zip') -split '\s+')[0]
-          $actual = (Get-FileHash aether.zip -Algorithm SHA256).Hash.ToLower()
-          if ($actual -ne $expected) { throw "Checksum mismatch: $actual != $expected" }
-          Expand-Archive aether.zip -DestinationPath aether-extract
-          Move-Item aether-extract/aether.exe src-tauri/binaries/aether.exe
+          bin=src-tauri/binaries/aether
+          [ "$RUNNER_OS" = "Windows" ] && bin=src-tauri/binaries/aether.exe
+          if [ ! -f "$bin" ]; then
+            echo "::error::$bin is missing — the fetch step did not produce a core, so this bundle would ship with no tunnel engine."
+            exit 1
+          fi
+          ls -l "$bin"
 
       - run: npm ci
 
