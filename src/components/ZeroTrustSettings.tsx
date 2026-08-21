@@ -6,10 +6,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { PANEL_INPUT } from "@/components/settings/SettingsPrimitives"
+import { isLocked } from "@/lib/connectionView"
 import { useConnectionStore } from "@/state/connectionStore"
-
-const INPUT =
-  "h-8 w-full rounded-md bg-black/20 px-2 text-xs text-foreground ring-1 ring-white/10 outline-none focus:ring-primary disabled:opacity-50"
 
 /** Aether 1.5.0's Cloudflare Zero Trust enrolment controls. Credentials stay
  * only in the running webview/backend process and are scrubbed before the
@@ -24,18 +23,22 @@ export function ZeroTrustSettings() {
   const setClientSecret = useConnectionStore((s) => s.setAccessClientSecret)
   const setToken = useConnectionStore((s) => s.setAccessToken)
   const setGateway = useConnectionStore((s) => s.setZeroTrustGateway)
-  const locked = status.state !== "Idle" && status.state !== "Error"
+  const locked = isLocked(status)
   const enabled = profile.zero_trust_team.trim().length > 0
 
   return (
-    <div className="flex flex-col gap-2 rounded-md bg-black/10 p-2 ring-1 ring-white/10">
+    <div className="flex flex-col gap-2">
+      <p className="text-xs leading-normal text-muted-foreground">
+        Connect as a managed device instead of anonymous consumer WARP. Leave
+        the team empty for normal one-click mode.
+      </p>
       <input
         type="text"
         value={profile.zero_trust_team}
         disabled={locked}
         onChange={(e) => setTeam(e.target.value)}
         placeholder="Team name (for example: acme)"
-        className={INPUT}
+        className={PANEL_INPUT}
         aria-label="Cloudflare Zero Trust team name"
       />
       {enabled && (
@@ -45,7 +48,7 @@ export function ZeroTrustSettings() {
             onValueChange={setAuth}
             disabled={locked}
           >
-            <SelectTrigger className="w-full text-xs">
+            <SelectTrigger size="sm" className="w-full text-xs">
               <SelectValue placeholder="Sign-in method" />
             </SelectTrigger>
             <SelectContent>
@@ -61,7 +64,7 @@ export function ZeroTrustSettings() {
               disabled={locked}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email for the one-time code"
-              className={INPUT}
+              className={PANEL_INPUT}
               aria-label="Zero Trust email"
             />
           )}
@@ -73,7 +76,7 @@ export function ZeroTrustSettings() {
                 disabled={locked}
                 onChange={(e) => setClientId(e.target.value)}
                 placeholder="Client ID"
-                className={INPUT}
+                className={PANEL_INPUT}
                 aria-label="Access service-token client ID"
               />
               <input
@@ -82,7 +85,7 @@ export function ZeroTrustSettings() {
                 disabled={locked}
                 onChange={(e) => setClientSecret(e.target.value)}
                 placeholder="Client secret"
-                className={INPUT}
+                className={PANEL_INPUT}
                 aria-label="Access service-token client secret"
               />
             </div>
@@ -94,25 +97,27 @@ export function ZeroTrustSettings() {
               disabled={locked}
               onChange={(e) => setToken(e.target.value)}
               placeholder="Enrollment access token (JWT)"
-              className={INPUT}
+              className={PANEL_INPUT}
               aria-label="Zero Trust enrollment access token"
             />
           )}
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">
-              Use organization Gateway proxy
-            </span>
-            <Switch
-              checked={profile.zero_trust_gateway}
-              onCheckedChange={setGateway}
-              disabled={locked}
-              aria-label="Use organization Gateway proxy"
-            />
+          <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5">
+            <p className="text-xs leading-snug text-muted-foreground">
+              Route HTTP/HTTPS through the organization&apos;s Gateway proxy —
+              it can apply your organization&apos;s filtering and logging.
+            </p>
+            <div className="ml-auto shrink-0">
+              <Switch
+                checked={profile.zero_trust_gateway}
+                onCheckedChange={setGateway}
+                disabled={locked}
+                aria-label="Use organization Gateway proxy"
+              />
+            </div>
           </div>
-          <p className="text-[10px] leading-4 text-muted-foreground">
+          <p className="text-[11px] leading-normal text-faint">
             Credentials are used only for this session and are never saved to
-            disk. Gateway can apply your organization&apos;s filtering and
-            logging.
+            disk.
           </p>
         </>
       )}
