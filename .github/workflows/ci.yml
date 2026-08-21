@@ -1,0 +1,129 @@
+name: ci
+
+# Correctness gate for every change. build.yml only runs on demand or on a
+# tag, so without this nothing checked a pull request at all — the first
+# signal that something was broken was a release build.
+on:
+  # Pushes to a PR branch are already covered by the pull_request trigger;
+  # listing every branch here too would run the whole matrix twice per push.
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
+
+  # The Rust side is compiled and tested on all three targets, because this is
+  # the only place platform-specific code (the unix exec-bit fixup, the
+  # Windows \\?\ path handling, PATH lookup) is exercised at all.
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      # tauri::generate_context! reads tauri.conf.json, which points at
+      # ../dist — so the Rust crate does not compile without a frontend build
+      # having produced one first.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      # rustfmt is platform-independent, so one runner is enough.
+      - name: Rustfmt
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      # -D warnings matches the gate CONTRIBUTING tells contributors to pass
+      # locally; without it the two drift and the doc becomes advisory.
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        working-directory: src-tauri
+        run: cargo test
+
+  # The fetch scripts are the one part of the build that can silently produce
+  # an app with no tunnel engine in it, so they get linted like source.
+  scripts:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: ShellCheck
+        # warning and up: style/info notes are worth reading but not worth
+        # failing a release pipeline over.
+        run: shellcheck --shell=bash --severity=warning src-tauri/binaries/fetch-aether.sh
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -ErrorAction Stop
+          # PSAvoidUsingWriteHost is excluded on purpose: this is a console
+          # script whose entire output is meant for a human watching a build.
+          $issues = Invoke-ScriptAnalyzer -Path src-tauri/binaries/fetch-aether.ps1 `
+            -Severity Error,Warning -ExcludeRule PSAvoidUsingWriteHost
+          if ($issues) { $issues | Format-Table -AutoSize | Out-String | Write-Host; exit 1 }
+          Write-Host "PSScriptAnalyzer clean"
+      - name: Version pin is a valid tag
+        run: |
+          pin="$(head -n1 src-tauri/binaries/AETHER_VERSION | tr -d '[:space:]')"
+          echo "Pinned Aether version: $pin"
+          curl -fsSL -o /dev/null "https://github.com/CluvexStudio/Aether/releases/download/$pin/SHA256SUMS.txt"
+
+  # Every manifest that carries the app version has to agree, or the installer
+  # name, the in-app footer and the crate version drift apart.
+  versions:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versions match across manifests
+        run: |
+          pkg=$(node -p "require('./package.json').version")
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          crate=$(grep -m1 '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "package.json=$pkg tauri.conf.json=$conf Cargo.toml=$crate"
+          test "$pkg" = "$conf" && test "$pkg" = "$crate"
