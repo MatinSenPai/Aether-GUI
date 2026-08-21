@@ -1,6 +1,6 @@
 [package]
 name = "aether-gui"
-version = "0.7.0"
+version = "0.7.1"
 description = "One-click GUI for the Aether censorship-circumvention tunnel"
 edition = "2021"
 
