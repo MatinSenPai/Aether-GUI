@@ -1,9 +1,9 @@
-import { AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface Props {
-  message: string;
-  onRetry: () => void;
+  message: string
+  onRetry: () => void
 }
 
 /** Full-screen fallback shown when the bundled Aether binary itself can't
@@ -16,10 +16,14 @@ export function SidecarErrorScreen({ message, onRetry }: Props) {
       <h1 className="text-base font-medium text-foreground">
         Aether engine failed to start
       </h1>
-      <p className="max-w-xs font-mono text-xs text-muted-foreground">{message}</p>
+      {/* resolve_binary reports one searched path per line — collapsing
+       * them into a single wrapped run makes the list unreadable. */}
+      <p className="max-w-xs font-mono text-xs whitespace-pre-line text-muted-foreground">
+        {message}
+      </p>
       <Button variant="outline" onClick={onRetry}>
         Retry
       </Button>
     </div>
-  );
+  )
 }

@@ -4,7 +4,9 @@ use thiserror::Error;
 pub enum AetherError {
     #[error("Aether is already running")]
     AlreadyRunning,
-    #[error("Aether binary not found at {0}")]
+    // The payload is a newline-separated list of the locations searched; the
+    // frontend splits it and renders each one as its own path line.
+    #[error("Aether binary not found. Looked in:\n{0}")]
     BinaryMissing(String),
     #[error("failed to launch Aether: {0}")]
     SpawnFailed(String),

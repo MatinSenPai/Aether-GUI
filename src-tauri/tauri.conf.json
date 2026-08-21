@@ -35,6 +35,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["binaries/*"]
+    "resources": ["binaries/aether*"]
   }
 }

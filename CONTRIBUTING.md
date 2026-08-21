@@ -9,7 +9,8 @@ at [CluvexStudio/Aether](https://github.com/CluvexStudio/Aether).
 
 Follow **Building from source** in the [README](README.md) — you'll need Node.js, the Rust stable
 toolchain, and Tauri's platform prerequisites, then `npm install` and the Aether binary fetched
-into `src-tauri/binaries/`. Run the app with `npm run tauri dev`.
+into `src-tauri/binaries/` (`fetch-aether.sh` on Linux/macOS, `fetch-aether.ps1` on Windows — don't
+skip it, or the app runs with no engine to drive). Run the app with `npm run tauri dev`.
 
 ## Before you open a PR
 
