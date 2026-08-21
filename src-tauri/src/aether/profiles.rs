@@ -302,6 +302,68 @@ impl ConnectionProfile {
     }
 }
 
+impl Default for ConnectionProfile {
+    fn default() -> Self {
+        // Mirrors Aether's own defaults.
+        Self {
+            protocol: Protocol::Auto,
+            scan_mode: ScanMode::Balanced,
+            ip_version: IpVersion::V4,
+            quick_reconnect: true,
+            masque_http2: false,
+            masque_noize: MasqueNoize::Firewall,
+            wg_noize: WgNoize::Balanced,
+            bind_address: default_bind_address(),
+            dns: String::new(),
+            zero_trust_team: String::new(),
+            zero_trust_auth: ZeroTrustAuth::Email,
+            access_email: String::new(),
+            access_client_id: String::new(),
+            access_client_secret: String::new(),
+            access_token: String::new(),
+            zero_trust_gateway: false,
+            route_block: String::new(),
+            route_direct: String::new(),
+            routes_file: String::new(),
+        }
+    }
+}
+
+const STORE_FILE: &str = "profile.json";
+const STORE_KEY: &str = "last_successful_profile";
+
+/// Loads the last profile that reached `Connected`, or the hardcoded default
+/// on first run. Only ever written by `save()` at the moment a connection
+/// actually succeeds (see aether/mod.rs) — never on a mere attempt, so a bad
+/// guess can't poison future one-click connects.
+pub fn load(app: &tauri::AppHandle) -> ConnectionProfile {
+    use tauri_plugin_store::StoreExt;
+    app.store(STORE_FILE)
+        .ok()
+        .and_then(|s| s.get(STORE_KEY))
+        .and_then(|v| serde_json::from_value(v).ok())
+        .unwrap_or_default()
+}
+
+pub fn save(app: &tauri::AppHandle, profile: &ConnectionProfile) {
+    use tauri_plugin_store::StoreExt;
+    if let Ok(store) = app.store(STORE_FILE) {
+        // A successful connection profile is useful to remember, but Access
+        // credentials are not. Leave them in process memory only; the next
+        // app launch will ask for them again rather than writing a JWT,
+        // service secret or email address into profile.json.
+        let mut persisted = profile.clone();
+        persisted.access_email.clear();
+        persisted.access_client_id.clear();
+        persisted.access_client_secret.clear();
+        persisted.access_token.clear();
+        if let Ok(value) = serde_json::to_value(persisted) {
+            store.set(STORE_KEY, value);
+            let _ = store.save();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,8 +377,10 @@ mod tests {
 
     #[test]
     fn custom_port_emits_bind() {
-        let mut p = ConnectionProfile::default();
-        p.bind_address = "127.0.0.1:1919".into();
+        let p = ConnectionProfile {
+            bind_address: "127.0.0.1:1919".into(),
+            ..Default::default()
+        };
         let args = p.as_args();
         let i = args
             .iter()
@@ -327,8 +391,10 @@ mod tests {
 
     #[test]
     fn lan_bind_emits_bind() {
-        let mut p = ConnectionProfile::default();
-        p.bind_address = "0.0.0.0:1819".into();
+        let p = ConnectionProfile {
+            bind_address: "0.0.0.0:1819".into(),
+            ..Default::default()
+        };
         let args = p.as_args();
         let i = args
             .iter()
@@ -339,8 +405,10 @@ mod tests {
 
     #[test]
     fn lan_with_custom_port_emits_bind() {
-        let mut p = ConnectionProfile::default();
-        p.bind_address = "0.0.0.0:9999".into();
+        let p = ConnectionProfile {
+            bind_address: "0.0.0.0:9999".into(),
+            ..Default::default()
+        };
         let args = p.as_args();
         let i = args
             .iter()
@@ -351,8 +419,10 @@ mod tests {
 
     #[test]
     fn invalid_bind_is_not_forwarded() {
-        let mut p = ConnectionProfile::default();
-        p.bind_address = "127.0.0.1:".into();
+        let p = ConnectionProfile {
+            bind_address: "127.0.0.1:".into(),
+            ..Default::default()
+        };
         let args = p.as_args();
         assert!(!args.iter().any(|a| a == "--bind"), "args={args:?}");
     }
@@ -422,67 +492,5 @@ mod tests {
             Some(("AETHER_ACCESS_EMAIL", "me@example.com"))
         );
         assert!(!p.as_args().iter().any(|arg| arg.contains("me@example.com")));
-    }
-}
-
-impl Default for ConnectionProfile {
-    fn default() -> Self {
-        // Mirrors Aether's own defaults.
-        Self {
-            protocol: Protocol::Auto,
-            scan_mode: ScanMode::Balanced,
-            ip_version: IpVersion::V4,
-            quick_reconnect: true,
-            masque_http2: false,
-            masque_noize: MasqueNoize::Firewall,
-            wg_noize: WgNoize::Balanced,
-            bind_address: default_bind_address(),
-            dns: String::new(),
-            zero_trust_team: String::new(),
-            zero_trust_auth: ZeroTrustAuth::Email,
-            access_email: String::new(),
-            access_client_id: String::new(),
-            access_client_secret: String::new(),
-            access_token: String::new(),
-            zero_trust_gateway: false,
-            route_block: String::new(),
-            route_direct: String::new(),
-            routes_file: String::new(),
-        }
-    }
-}
-
-const STORE_FILE: &str = "profile.json";
-const STORE_KEY: &str = "last_successful_profile";
-
-/// Loads the last profile that reached `Connected`, or the hardcoded default
-/// on first run. Only ever written by `save()` at the moment a connection
-/// actually succeeds (see aether/mod.rs) — never on a mere attempt, so a bad
-/// guess can't poison future one-click connects.
-pub fn load(app: &tauri::AppHandle) -> ConnectionProfile {
-    use tauri_plugin_store::StoreExt;
-    app.store(STORE_FILE)
-        .ok()
-        .and_then(|s| s.get(STORE_KEY))
-        .and_then(|v| serde_json::from_value(v).ok())
-        .unwrap_or_default()
-}
-
-pub fn save(app: &tauri::AppHandle, profile: &ConnectionProfile) {
-    use tauri_plugin_store::StoreExt;
-    if let Ok(store) = app.store(STORE_FILE) {
-        // A successful connection profile is useful to remember, but Access
-        // credentials are not. Leave them in process memory only; the next
-        // app launch will ask for them again rather than writing a JWT,
-        // service secret or email address into profile.json.
-        let mut persisted = profile.clone();
-        persisted.access_email.clear();
-        persisted.access_client_id.clear();
-        persisted.access_client_secret.clear();
-        persisted.access_token.clear();
-        if let Ok(value) = serde_json::to_value(persisted) {
-            store.set(STORE_KEY, value);
-            let _ = store.save();
-        }
     }
 }
