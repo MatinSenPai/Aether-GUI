@@ -58,11 +58,21 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 
    Aether-GUI bundles the real `aether` binary from [CluvexStudio/Aether releases](https://github.com/CluvexStudio/Aether/releases) rather than building it — this repo only ships the GUI. Fetch and checksum-verify it for your platform:
 
+   On Linux and macOS:
+
    ```sh
    ./src-tauri/binaries/fetch-aether.sh
    ```
 
-   This script covers Linux and macOS directly. On Windows, download the matching `aether-windows-*.zip` from the [Aether releases page](https://github.com/CluvexStudio/Aether/releases) yourself, verify it against the published `SHA256SUMS.txt`, and extract `aether.exe` into `src-tauri/binaries/`.
+   On Windows (PowerShell):
+
+   ```powershell
+   ./src-tauri/binaries/fetch-aether.ps1
+   ```
+
+   Both scripts read the version pin from `src-tauri/binaries/AETHER_VERSION` and verify the download against the release's published `SHA256SUMS.txt`. CI runs these same two scripts, so a local build and a release build get the identical core. Running `fetch-aether.sh` from Git Bash on Windows just hands off to the PowerShell one.
+
+   **This step is not optional.** Skipping it still produces a working build, but the app boots straight into its "engine missing" screen, because there is no tunnel engine inside it to drive.
 
 4. **Run in development mode**
 

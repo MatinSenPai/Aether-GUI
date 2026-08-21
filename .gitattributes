@@ -1,0 +1,17 @@
+# Shell scripts must keep LF endings whatever the checkout platform does.
+# With core.autocrlf=true on Windows — the default for Git for Windows — a
+# CRLF checkout gives Linux and macOS runners `bad interpreter: bash^M` when
+# they run the Aether fetch script, and the build fails with no engine.
+*.sh text eol=lf
+
+# PowerShell handles either ending, but keeping the pair consistent means the
+# two fetch scripts diff cleanly against each other.
+*.ps1 text eol=lf
+
+# The version pin is read with `head -n1` on unix; a trailing CR would end up
+# in the release URL.
+AETHER_VERSION text eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
