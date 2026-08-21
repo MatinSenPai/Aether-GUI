@@ -1,45 +1,52 @@
-import { useWindowFocused } from "@/state/windowFocus";
+import { useWindowFocused } from "@/state/windowFocus"
 
 /**
- * Two soft gradient orbs. All motion is pure CSS (transform/opacity
- * keyframes in index.css) on compositor-promoted layers — zero main-thread
- * work per frame, honors prefers-reduced-motion via the media query there.
- * No blur filter: a radial gradient already fades smoothly, so blur-[65px]
- * was visually redundant while forcing an expensive re-raster of the layer.
+ * Two drifting accent orbs behind the app column — the design's warm bloom
+ * over the metallic ground. All motion is pure CSS (the noct-drift keyframes
+ * in index.css) on compositor-promoted layers: zero main-thread work per
+ * frame, and prefers-reduced-motion is handled by the media query there.
+ *
+ * The design's `filter: blur(10px)` is dropped on purpose — a radial
+ * gradient already fades smoothly at these radii, so the blur was visually
+ * redundant while forcing an expensive re-raster of the layer every frame.
  * Paused (not removed) while the window is unfocused so the app costs
  * ~nothing in the background and nothing jumps on refocus.
  */
 export function AmbientBackground() {
-  const focused = useWindowFocused();
+  const focused = useWindowFocused()
   // Inline, not a Tailwind pause class — the unlayered .anim-* shorthands
-  // beat layered utilities in the cascade (see ConnectButton).
-  const playState = { animationPlayState: focused ? ("running" as const) : ("paused" as const) };
+  // beat layered utilities in the cascade (see ConnectDial).
+  const playState = {
+    animationPlayState: focused ? ("running" as const) : ("paused" as const),
+  }
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+    >
       <div
-        className="anim-orb-a absolute size-65 rounded-full"
+        className="anim-drift absolute size-85 rounded-full"
         style={{
-          top: -60,
-          right: -60,
-          opacity: 0.14,
-          background: "radial-gradient(circle, var(--color-primary) 0%, transparent 70%)",
-          willChange: "transform, opacity",
+          left: -110,
+          top: 40,
+          background:
+            "radial-gradient(circle, rgb(var(--accent-rgb) / 0.2), transparent 70%)",
+          willChange: "transform",
           ...playState,
         }}
       />
       <div
-        className="anim-orb-b absolute size-55 rounded-full"
+        className="anim-drift-slow absolute size-75 rounded-full"
         style={{
+          right: -120,
           bottom: -40,
-          left: -80,
-          opacity: 0.1,
           background:
-            "radial-gradient(circle, var(--color-status-connected) 0%, transparent 70%)",
-          willChange: "transform, opacity",
+            "radial-gradient(circle, rgba(96, 42, 44, 0.75), transparent 70%)",
+          willChange: "transform",
           ...playState,
         }}
       />
     </div>
-  );
+  )
 }

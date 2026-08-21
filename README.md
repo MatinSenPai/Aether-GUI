@@ -19,8 +19,8 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
 
 ## Features
 
-- **Auto mode** — the default screen is just a single button. No configuration is required; it connects using your last-successful settings (or sensible defaults on first run).
-- **Advanced panel** — for when you want control, a collapsible panel exposes the real options Aether's setup supports:
+- **One control** — the default screen is a single dial that doubles as the button, the progress ring and the status light. No configuration is required; it connects using your last-successful settings (or sensible defaults on first run).
+- **Settings drawer** — for when you want control, the window opens sideways into a panel exposing the real options Aether's setup supports:
   - **Protocol**: MASQUE (disguises traffic as normal HTTPS), WireGuard (lighter, faster), or WARP-in-WARP/gool (two nested WireGuard tunnels for extra security at a speed cost)
   - **Scan Mode**: Turbo, Balanced, Thorough, Stealth, or Ironclad — trading route-discovery speed against how much probe traffic it generates; Ironclad opens a real tunnel through each candidate and sends a real HTTP request before trusting it (slowest, but guaranteed working)
   - **IP Version**: IPv4, IPv6, or both
@@ -28,8 +28,9 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
   - **Obfuscation**: how heavily the handshake is disguised from DPI — profiles adapt to the selected protocol; escalate if the default can't get through
   - **Quick reconnect**: remember the last working gateway and re-test it first, skipping the full scan when it still works
   
-  Each option has an explanation on hover.
-- **Live progress** — while Aether searches for a working route, the GUI shows real elapsed time and, once Aether reports its own scan budget, an actual percentage and progress bar — not just a spinner.
+  Every option carries its trade-off as visible copy next to the control, not as a hover tooltip.
+- **Live progress** — while Aether searches for a working route, the GUI shows the named phase and real elapsed time and, once Aether reports its own scan budget, an actual percentage that also fills the dial's ring — not just a spinner.
+- **Raw log stream** — the same drawer's Logs tab shows Aether's pty output verbatim, timestamped and level-tagged, with one-click copy for bug reports.
 - **Automatic reconnect** — if the tunnel drops unexpectedly mid-session (observed occasionally with WARP-in-WARP, but handled the same way for every protocol), the GUI retries automatically with backoff, shown as a visible "Reconnecting… (attempt N of 3)" rather than silently dying or dumping you back to a bare error. A user-requested disconnect is never retried.
 
 ## Installing

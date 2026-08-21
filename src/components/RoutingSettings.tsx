@@ -1,9 +1,9 @@
+import {
+  PANEL_INPUT,
+  PANEL_TEXTAREA,
+} from "@/components/settings/SettingsPrimitives"
+import { isLocked } from "@/lib/connectionView"
 import { useConnectionStore } from "@/state/connectionStore"
-
-const INPUT =
-  "h-8 w-full rounded-md bg-black/20 px-2 text-xs text-foreground ring-1 ring-white/10 outline-none focus:ring-primary disabled:opacity-50"
-const AREA =
-  "min-h-16 w-full resize-y rounded-md bg-black/20 px-2 py-1.5 text-xs text-foreground ring-1 ring-white/10 outline-none focus:ring-primary disabled:opacity-50"
 
 /** Aether 1.5.0 DNS and routing controls. Each list accepts the exact
  * comma/newline-separated format documented by the core. */
@@ -14,17 +14,17 @@ export function RoutingSettings() {
   const setRouteBlock = useConnectionStore((s) => s.setRouteBlock)
   const setRouteDirect = useConnectionStore((s) => s.setRouteDirect)
   const setRoutesFile = useConnectionStore((s) => s.setRoutesFile)
-  const locked = status.state !== "Idle" && status.state !== "Error"
+  const locked = isLocked(status)
 
   return (
-    <div className="flex flex-col gap-2 rounded-md bg-black/10 p-2 ring-1 ring-white/10">
+    <div className="flex flex-col gap-2">
       <input
         type="text"
         value={profile.dns}
         disabled={locked}
         onChange={(e) => setDns(e.target.value)}
         placeholder="Tunnel DNS, e.g. 1.1.1.1,1.0.0.1 (optional)"
-        className={INPUT}
+        className={PANEL_INPUT}
         aria-label="Tunnel DNS resolvers"
       />
       <textarea
@@ -32,7 +32,7 @@ export function RoutingSettings() {
         disabled={locked}
         onChange={(e) => setRouteBlock(e.target.value)}
         placeholder="Block: domains, CIDRs, ports… (optional)"
-        className={AREA}
+        className={PANEL_TEXTAREA}
         aria-label="Blocked routes"
       />
       <textarea
@@ -40,7 +40,7 @@ export function RoutingSettings() {
         disabled={locked}
         onChange={(e) => setRouteDirect(e.target.value)}
         placeholder="Direct: banking, LAN, domestic sites… (optional)"
-        className={AREA}
+        className={PANEL_TEXTAREA}
         aria-label="Direct routes"
       />
       <input
@@ -49,14 +49,16 @@ export function RoutingSettings() {
         disabled={locked}
         onChange={(e) => setRoutesFile(e.target.value)}
         placeholder="Rules file path (optional)"
-        className={INPUT}
+        className={PANEL_INPUT}
         aria-label="Routing rules file path"
       />
-      <p className="text-[10px] leading-4 text-muted-foreground">
-        Supports domain, IP/CIDR, <code>port:443</code>, <code>private</code>,
-        and Aether&apos;s
-        <code>full:</code>/<code>keyword:</code>/<code>regexp:</code> rules.
-        Block wins over direct.
+      <p className="text-[11px] leading-normal text-faint">
+        Supports domain, IP/CIDR, <code className="font-mono">port:443</code>,{" "}
+        <code className="font-mono">private</code>, and Aether&apos;s{" "}
+        <code className="font-mono">full:</code>/
+        <code className="font-mono">keyword:</code>/
+        <code className="font-mono">regexp:</code> rules. Block wins over
+        direct.
       </p>
     </div>
   )
