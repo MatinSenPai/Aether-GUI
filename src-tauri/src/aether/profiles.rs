@@ -11,6 +11,8 @@ pub enum Protocol {
     Masque,
     Wireguard,
     Gool,
+    /// Aether ≥2.0.0 MASQUE-in-MASQUE: two MASQUE hops for a different exit.
+    Mim,
 }
 
 impl Protocol {
@@ -20,6 +22,7 @@ impl Protocol {
             Protocol::Auto | Protocol::Masque => "1",
             Protocol::Wireguard => "2",
             Protocol::Gool => "3",
+            Protocol::Mim => "4",
         }
     }
 }
@@ -30,7 +33,10 @@ pub enum ScanMode {
     Turbo,
     Balanced,
     Thorough,
-    Stealth,
+    /// Called `stealth` before Aether 1.x's rename; the core still accepts
+    /// both names. `alias` keeps profiles saved by older GUIs loading.
+    #[serde(alias = "stealth")]
+    Verified,
     Ironclad,
 }
 
@@ -40,7 +46,7 @@ impl ScanMode {
             ScanMode::Turbo => "1",
             ScanMode::Balanced => "2",
             ScanMode::Thorough => "3",
-            ScanMode::Stealth => "4",
+            ScanMode::Verified => "4",
             ScanMode::Ironclad => "5",
         }
     }
@@ -172,6 +178,16 @@ pub struct ConnectionProfile {
     /// Optional path to an Aether routing file with [block]/[direct] sections.
     #[serde(default)]
     pub routes_file: String,
+    /// Aether ≥1.6.0: also serve an HTTP CONNECT proxy on this address.
+    #[serde(default)]
+    pub http_proxy: String,
+    /// Aether ≥1.7.0: dial out through another proxy (`socks5://host:port`,
+    /// `http://host:port`, or bare `host:port`).
+    #[serde(default)]
+    pub upstream: String,
+    /// Aether ≥2.1.0: exit-country filter, e.g. `!IR,RU` or `DE,SE`.
+    #[serde(default)]
+    pub exit_loc: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
@@ -213,12 +229,13 @@ impl ConnectionProfile {
             Protocol::Masque => args.push("--masque".into()),
             Protocol::Wireguard => args.push("--wg".into()),
             Protocol::Gool => args.push("--gool".into()),
+            Protocol::Mim => args.push("--mim".into()),
         }
         args.push(match self.scan_mode {
             ScanMode::Turbo => "--turbo".into(),
             ScanMode::Balanced => "--balanced".into(),
             ScanMode::Thorough => "--thorough".into(),
-            ScanMode::Stealth => "--stealth".into(),
+            ScanMode::Verified => "--verified".into(),
             ScanMode::Ironclad => "--ironclad".into(),
         });
         args.push(match self.ip_version {
@@ -235,7 +252,7 @@ impl ConnectionProfile {
         args.push("--noize".into());
         args.push(
             match self.protocol {
-                Protocol::Auto | Protocol::Masque => self.masque_noize.as_flag(),
+                Protocol::Auto | Protocol::Masque | Protocol::Mim => self.masque_noize.as_flag(),
                 Protocol::Wireguard | Protocol::Gool => self.wg_noize.as_flag(),
             }
             .into(),
@@ -257,6 +274,18 @@ impl ConnectionProfile {
             if self.zero_trust_gateway {
                 args.push("--gateway".into());
             }
+        }
+        if self.http_proxy.trim().parse::<std::net::SocketAddr>().is_ok() {
+            args.push("--http-proxy".into());
+            args.push(self.http_proxy.trim().into());
+        }
+        if !self.upstream.trim().is_empty() {
+            args.push("--upstream".into());
+            args.push(self.upstream.trim().into());
+        }
+        if !self.exit_loc.trim().is_empty() {
+            args.push("--exit-loc".into());
+            args.push(self.exit_loc.trim().into());
         }
         if !self.route_block.trim().is_empty() {
             args.push("--route-block".into());
@@ -411,6 +440,51 @@ mod tests {
     }
 
     #[test]
+    fn v2_options_emit_flags() {
+        let p = ConnectionProfile {
+            protocol: Protocol::Mim,
+            scan_mode: ScanMode::Verified,
+            http_proxy: "127.0.0.1:1820".into(),
+            upstream: "socks5://127.0.0.1:1080".into(),
+            exit_loc: "!IR,RU".into(),
+            ..Default::default()
+        };
+        assert_eq!(
+            p.as_args(),
+            vec![
+                "--mim",
+                "--verified",
+                "-4",
+                "--quick-reconnect",
+                "--noize",
+                "firewall",
+                "--http-proxy",
+                "127.0.0.1:1820",
+                "--upstream",
+                "socks5://127.0.0.1:1080",
+                "--exit-loc",
+                "!IR,RU"
+            ]
+        );
+    }
+
+    #[test]
+    fn invalid_http_proxy_is_not_forwarded() {
+        let p = ConnectionProfile {
+            http_proxy: "1820".into(),
+            ..Default::default()
+        };
+        assert!(!p.as_args().iter().any(|a| a == "--http-proxy"));
+    }
+
+    #[test]
+    fn legacy_stealth_profile_loads_as_verified() {
+        let json = r#"{"protocol":"auto","scan_mode":"stealth","ip_version":"v4"}"#;
+        let p: ConnectionProfile = serde_json::from_str(json).unwrap();
+        assert_eq!(p.scan_mode, ScanMode::Verified);
+    }
+
+    #[test]
     fn zero_trust_email_is_provided_as_an_environment_value() {
         let p = ConnectionProfile {
             zero_trust_team: "acme".into(),
@@ -448,6 +522,9 @@ impl Default for ConnectionProfile {
             route_block: String::new(),
             route_direct: String::new(),
             routes_file: String::new(),
+            http_proxy: String::new(),
+            upstream: String::new(),
+            exit_loc: String::new(),
         }
     }
 }

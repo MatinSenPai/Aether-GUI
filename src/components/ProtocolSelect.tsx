@@ -13,6 +13,7 @@ const LABELS: Record<Protocol, string> = {
   masque: "MASQUE",
   wireguard: "WireGuard",
   gool: "WARP-in-WARP (gool)",
+  mim: "MASQUE-in-MASQUE",
 };
 
 /**

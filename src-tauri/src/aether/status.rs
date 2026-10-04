@@ -38,7 +38,7 @@ pub fn connect_timeout(scan_mode: &ScanMode) -> Duration {
         ScanMode::Turbo => 90,
         ScanMode::Balanced => 150,
         ScanMode::Thorough => 330,
-        ScanMode::Stealth => 210,
+        ScanMode::Verified => 210,
         ScanMode::Ironclad => 240,
     })
 }
@@ -114,7 +114,7 @@ mod tests {
         assert!(connect_timeout(&ScanMode::Turbo) > Duration::from_secs(45));
         assert!(connect_timeout(&ScanMode::Balanced) > Duration::from_secs(120));
         assert!(connect_timeout(&ScanMode::Thorough) > Duration::from_secs(300));
-        assert!(connect_timeout(&ScanMode::Stealth) > Duration::from_secs(180));
+        assert!(connect_timeout(&ScanMode::Verified) > Duration::from_secs(180));
         assert!(connect_timeout(&ScanMode::Ironclad) > Duration::from_secs(180));
     }
 }

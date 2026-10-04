@@ -45,6 +45,9 @@ interface ConnectionState {
   setRouteBlock: (route_block: string) => void;
   setRouteDirect: (route_direct: string) => void;
   setRoutesFile: (routes_file: string) => void;
+  setHttpProxy: (http_proxy: string) => void;
+  setUpstream: (upstream: string) => void;
+  setExitLoc: (exit_loc: string) => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -70,6 +73,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     route_block: "",
     route_direct: "",
     routes_file: "",
+    http_proxy: "",
+    upstream: "",
+    exit_loc: "",
   },
   logs: [],
   sidecarError: null,
@@ -169,6 +175,15 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setRoutesFile: (routes_file) =>
     set((s) => ({ profile: { ...s.profile, routes_file } })),
+
+  setHttpProxy: (http_proxy) =>
+    set((s) => ({ profile: { ...s.profile, http_proxy } })),
+
+  setUpstream: (upstream) =>
+    set((s) => ({ profile: { ...s.profile, upstream } })),
+
+  setExitLoc: (exit_loc) =>
+    set((s) => ({ profile: { ...s.profile, exit_loc } })),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set

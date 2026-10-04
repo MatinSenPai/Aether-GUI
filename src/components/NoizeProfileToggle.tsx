@@ -44,7 +44,7 @@ export function NoizeProfileToggle() {
   const setWgNoize = useConnectionStore((s) => s.setWgNoize);
 
   const locked = status.state !== "Idle" && status.state !== "Error";
-  const isMasque = protocol === "auto" || protocol === "masque";
+  const isMasque = protocol === "auto" || protocol === "masque" || protocol === "mim";
 
   if (isMasque) {
     return (

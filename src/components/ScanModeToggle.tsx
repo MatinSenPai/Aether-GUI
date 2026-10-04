@@ -7,7 +7,7 @@ const LABELS: Record<ScanMode, string> = {
   turbo: "Turbo",
   balanced: "Balanced",
   thorough: "Thorough",
-  stealth: "Stealth",
+  verified: "Verified",
   ironclad: "Ironclad",
 };
 
@@ -16,7 +16,8 @@ const DESCRIPTIONS: Record<ScanMode, string> = {
     "Fastest route discovery, but the most probe traffic — an easier pattern for a censor to notice.",
   balanced: "Good default — reasonable speed without excessive probing.",
   thorough: "Slower, more exhaustive search for working routes.",
-  stealth: "Slowest and most cautious — hardest for a censor to fingerprint.",
+  verified:
+    "Only dials gateways measured to work — never a guessed neighbour. Quiet and precise; on gool and MASQUE-in-MASQUE it also keeps the two hops in different ranges, which changes your exit address.",
   ironclad:
     "Opens a real tunnel through each candidate and sends a real HTTP request before trusting it. Slowest, but guarantees the gateway actually works.",
 };

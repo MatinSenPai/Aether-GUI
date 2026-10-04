@@ -10,8 +10,8 @@ export type ConnectionStatus =
   | { state: "Disconnecting" }
   | { state: "Error"; message: string; phase: string };
 
-export type Protocol = "auto" | "masque" | "wireguard" | "gool";
-export type ScanMode = "turbo" | "balanced" | "thorough" | "stealth" | "ironclad";
+export type Protocol = "auto" | "masque" | "wireguard" | "gool" | "mim";
+export type ScanMode = "turbo" | "balanced" | "thorough" | "verified" | "ironclad";
 export type IpVersion = "v4" | "v6" | "both";
 export type MasqueNoize = "firewall" | "gfw" | "off";
 export type WgNoize = "balanced" | "aggressive" | "light" | "off";
@@ -49,6 +49,12 @@ export interface ConnectionProfile {
   route_block: string;
   route_direct: string;
   routes_file: string;
+  /** Aether ≥1.6.0: extra HTTP CONNECT proxy address (empty = off). */
+  http_proxy: string;
+  /** Aether ≥1.7.0: chain through another proxy (socks5://… or http://…). */
+  upstream: string;
+  /** Aether ≥2.1.0: exit-country filter, e.g. "!IR,RU" or "DE,SE". */
+  exit_loc: string;
 }
 
 export interface LogLine {

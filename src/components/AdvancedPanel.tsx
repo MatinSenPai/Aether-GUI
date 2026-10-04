@@ -15,6 +15,7 @@ import { NoizeProfileToggle } from "@/components/NoizeProfileToggle";
 import { BindAddressField } from "@/components/BindAddressField";
 import { ZeroTrustSettings } from "@/components/ZeroTrustSettings";
 import { RoutingSettings } from "@/components/RoutingSettings";
+import { ProxyChainSettings } from "@/components/ProxyChainSettings";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -88,7 +89,7 @@ export function AdvancedPanel() {
           <div className="flex flex-col gap-4 pb-2">
             <FieldRow
               label="Protocol"
-              tooltip="MASQUE disguises traffic as normal HTTPS — best against strict censorship. WireGuard is lighter and faster. gool nests two WireGuard tunnels for extra security at a speed cost."
+              tooltip="MASQUE disguises traffic as normal HTTPS — best against strict censorship. WireGuard is lighter and faster. gool nests two WireGuard tunnels and MASQUE-in-MASQUE nests two MASQUE hops — both give a different exit address at a speed cost."
             >
               <ProtocolSelect />
             </FieldRow>
@@ -118,6 +119,12 @@ export function AdvancedPanel() {
               tooltip="The local address Aether's SOCKS5 proxy listens on. Change the port to avoid conflicts, or enable LAN to share the tunnel with other devices on your network."
             >
               <BindAddressField />
+            </FieldRow>
+            <FieldRow
+              label="HTTP Proxy, Upstream & Exit"
+              tooltip="Optional Aether 2 controls: an extra HTTP CONNECT proxy for apps without SOCKS5, chaining through another proxy already running on this machine, and refusing tunnels that exit in unwanted countries."
+            >
+              <ProxyChainSettings />
             </FieldRow>
             <FieldRow
               label="Zero Trust (organization)"

@@ -21,11 +21,12 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
 
 - **Auto mode** — the default screen is just a single button. No configuration is required; it connects using your last-successful settings (or sensible defaults on first run).
 - **Advanced panel** — for when you want control, a collapsible panel exposes the real options Aether's setup supports:
-  - **Protocol**: MASQUE (disguises traffic as normal HTTPS), WireGuard (lighter, faster), or WARP-in-WARP/gool (two nested WireGuard tunnels for extra security at a speed cost)
-  - **Scan Mode**: Turbo, Balanced, Thorough, Stealth, or Ironclad — trading route-discovery speed against how much probe traffic it generates; Ironclad opens a real tunnel through each candidate and sends a real HTTP request before trusting it (slowest, but guaranteed working)
+  - **Protocol**: MASQUE (disguises traffic as normal HTTPS), WireGuard (lighter, faster), or WARP-in-WARP/gool (two nested WireGuard tunnels), or MASQUE-in-MASQUE (two nested MASQUE hops) — the nested modes give a different exit address at a speed cost
+  - **Scan Mode**: Turbo, Balanced, Thorough, Verified (only edges measured to work), or Ironclad — trading route-discovery speed against how much probe traffic it generates; Ironclad opens a real tunnel through each candidate and sends a real HTTP request before trusting it (slowest, but guaranteed working)
   - **IP Version**: IPv4, IPv6, or both
   - **MASQUE Transport**: HTTP/3 (QUIC — fastest handshake) or HTTP/2 (TCP — looks like ordinary HTTPS, works where UDP is blocked or throttled)
   - **Obfuscation**: how heavily the handshake is disguised from DPI — profiles adapt to the selected protocol; escalate if the default can't get through
+  - **HTTP Proxy, Upstream & Exit**: an extra HTTP CONNECT proxy for apps without SOCKS5, chaining through another proxy already running on your machine, and an exit-country filter that refuses tunnels leaving from unwanted countries
   - **Quick reconnect**: remember the last working gateway and re-test it first, skipping the full scan when it still works
   
   Each option has an explanation on hover.
@@ -81,7 +82,7 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 ## How it works
 
 - **Frontend**: React 19 + Tailwind v4, state managed with Zustand, animated with [Motion](https://motion.dev/) — all talking to the Rust backend over Tauri's IPC. Deliberately lightweight: the ambient background is two compositor-only CSS gradient orbs, and every looping animation freezes while the window is unfocused, so the app costs next to nothing sitting in the background.
-- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real [Aether v1.5.0](https://github.com/CluvexStudio/Aether/releases/tag/v1.5.0) binary in a genuine pseudo-terminal. Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), obfuscation profile, quick reconnect, Zero Trust, tunnel DNS and routing rules — is passed up front as CLI flags/environment, so Aether's interactive prompts normally never appear. A Zero Trust email-code prompt is bridged safely into the GUI; credentials are never written to the saved profile.
+- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real [Aether v2.1.0](https://github.com/CluvexStudio/Aether/releases/tag/v2.1.0) binary in a genuine pseudo-terminal. Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), obfuscation profile, quick reconnect, Zero Trust, tunnel DNS, routing rules, HTTP proxy, upstream proxy and exit-country filter — is passed up front as CLI flags/environment, so Aether's interactive prompts normally never appear. A Zero Trust email-code prompt is bridged safely into the GUI; credentials are never written to the saved profile.
 - **Ground truth for "connected"**: the GUI doesn't trust Aether's log wording alone (that's fragile across releases) — it treats a successful TCP connection to the local SOCKS5 port (`127.0.0.1:1819`) as the actual proof the tunnel is up.
 - **State machine**: `Idle → Launching → Connecting → Connected`, with `Reconnecting` and `Error` as the two ways a connection attempt can end up needing your attention — `Reconnecting` retries automatically (with backoff, capped at 3 attempts), `Error` is the final word once retries are exhausted or something isn't retriable (e.g. the binary itself is missing).
 
