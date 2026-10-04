@@ -3,6 +3,9 @@ use crate::error::AetherError;
 use crate::state::{AppState, ConnectionState};
 use crate::tray;
 use tauri::{AppHandle, State};
+use tauri_plugin_autostart::ManagerExt;
+
+const AUTO_CONNECT: &str = "auto_connect";
 
 #[tauri::command]
 pub fn connect(
@@ -47,4 +50,30 @@ pub fn get_close_to_tray() -> bool {
 #[tauri::command]
 pub fn set_close_to_tray(app: AppHandle, enabled: bool) {
     tray::set_close_to_tray(&app, enabled);
+}
+
+#[tauri::command]
+pub fn get_autostart(app: AppHandle) -> bool {
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[tauri::command]
+pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let launcher = app.autolaunch();
+    if enabled {
+        launcher.enable()
+    } else {
+        launcher.disable()
+    }
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_auto_connect(app: AppHandle) -> bool {
+    crate::prefs::get_bool(&app, AUTO_CONNECT)
+}
+
+#[tauri::command]
+pub fn set_auto_connect(app: AppHandle, enabled: bool) {
+    crate::prefs::set_bool(&app, AUTO_CONNECT, enabled);
 }

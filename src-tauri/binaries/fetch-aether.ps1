@@ -78,6 +78,15 @@ try {
     if (-not $exe) { throw "aether.exe not found inside $asset" }
 
     Move-Item -Path $exe.FullName -Destination $dest -Force
+
+    # Tor and Psiphon helpers (lyrebird, psiphon-tunnel-core) ship in pt/
+    # beside the binary; the core looks for them there, so they travel with it.
+    $pt = Join-Path $exe.DirectoryName "pt"
+    if (Test-Path $pt) {
+        $ptDest = Join-Path $destDir "pt"
+        if (Test-Path $ptDest) { Remove-Item $ptDest -Recurse -Force }
+        Move-Item -Path $pt -Destination $ptDest
+    }
     Write-Host "Aether binary ready at $dest"
 } finally {
     Remove-Item -Path $work -Recurse -Force -ErrorAction SilentlyContinue

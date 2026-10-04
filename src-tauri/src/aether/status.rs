@@ -1,4 +1,4 @@
-use super::profiles::ScanMode;
+use super::profiles::{ConnectionProfile, ScanMode};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::time::Duration;
 
@@ -42,6 +42,17 @@ pub fn connect_timeout(scan_mode: &ScanMode) -> Duration {
         ScanMode::Verified => 210,
         ScanMode::Ironclad => 240,
     })
+}
+
+/// Connect deadline for a whole profile: the scan budget (none when running
+/// Tor/Psiphon without a tunnel) plus whatever Tor/Psiphon itself may need.
+pub fn profile_connect_timeout(p: &ConnectionProfile) -> Duration {
+    let scan = if p.network_mode.is_only() {
+        Duration::ZERO
+    } else {
+        connect_timeout(&p.scan_mode)
+    };
+    scan + Duration::from_secs(p.network_mode.extra_wait_secs())
 }
 
 /// How long to wait after sending Ctrl-C before force-killing. Manually
@@ -144,5 +155,25 @@ mod tests {
         assert!(connect_timeout(&ScanMode::Thorough) > Duration::from_secs(300));
         assert!(connect_timeout(&ScanMode::Verified) > Duration::from_secs(180));
         assert!(connect_timeout(&ScanMode::Ironclad) > Duration::from_secs(180));
+    }
+
+    #[test]
+    fn profile_timeout_covers_tor_and_psiphon() {
+        use super::super::profiles::NetworkMode;
+        let base = ConnectionProfile::default();
+        assert_eq!(
+            profile_connect_timeout(&base),
+            connect_timeout(&base.scan_mode)
+        );
+        let only = ConnectionProfile {
+            network_mode: NetworkMode::TorOnly,
+            ..Default::default()
+        };
+        assert!(profile_connect_timeout(&only) > Duration::from_secs(75 + 360));
+        let chain = ConnectionProfile {
+            network_mode: NetworkMode::PsiphonChain,
+            ..Default::default()
+        };
+        assert!(profile_connect_timeout(&chain) > connect_timeout(&chain.scan_mode));
     }
 }

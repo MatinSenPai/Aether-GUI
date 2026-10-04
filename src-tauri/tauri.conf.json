@@ -19,6 +19,7 @@
         "minWidth": 420,
         "minHeight": 640,
         "center": true,
+        "visible": false,
         "decorations": false,
         "backgroundColor": "#0D0D0F"
       }
@@ -37,6 +38,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["binaries/aether*"]
+    "resources": ["binaries/aether*", "binaries/pt/*"]
   }
 }

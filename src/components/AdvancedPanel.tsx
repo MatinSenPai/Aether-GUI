@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Info, Settings2 } from "lucide-react";
+import { ChevronDown, Copy, Info, Settings2, Trash2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,6 +16,7 @@ import { BindAddressField } from "@/components/BindAddressField";
 import { ZeroTrustSettings } from "@/components/ZeroTrustSettings";
 import { RoutingSettings } from "@/components/RoutingSettings";
 import { ProxyChainSettings } from "@/components/ProxyChainSettings";
+import { NetworkModeSelect } from "@/components/NetworkModeSelect";
 import { useConnectionStore } from "@/state/connectionStore";
 
 function FieldRow({
@@ -58,6 +59,13 @@ function FieldRow({
  */
 export function AdvancedPanel() {
   const logs = useConnectionStore((s) => s.logs);
+  const clearLogs = useConnectionStore((s) => s.clearLogs);
+  const networkMode = useConnectionStore((s) => s.profile.network_mode);
+  const systemProxy = useConnectionStore((s) => s.profile.system_proxy);
+  const setSystemProxy = useConnectionStore((s) => s.setSystemProxy);
+  // Plain Tor/Psiphon runs without a WARP tunnel, so the tunnel's own
+  // route-discovery options don't apply.
+  const tunnelOptions = networkMode !== "psiphon_only" && networkMode !== "tor_only";
   const status = useConnectionStore((s) => s.status);
   const quickReconnect = useConnectionStore((s) => s.profile.quick_reconnect);
   const setQuickReconnect = useConnectionStore((s) => s.setQuickReconnect);
@@ -88,32 +96,42 @@ export function AdvancedPanel() {
         <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-1 data-[state=open]:duration-150 data-[state=open]:[animation-timing-function:cubic-bezier(0.16,1,0.3,1)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-100">
           <div className="flex flex-col gap-4 pb-2">
             <FieldRow
-              label="Protocol"
-              tooltip="MASQUE disguises traffic as normal HTTPS — best against strict censorship. WireGuard is lighter and faster. gool nests two WireGuard tunnels and MASQUE-in-MASQUE nests two MASQUE hops — both give a different exit address at a speed cost."
+              label="Network"
+              tooltip="Carry Tor or Psiphon, alone or together with WARP. Psiphon works out of the box and is often the fastest way out of a filtered network."
             >
-              <ProtocolSelect />
+              <NetworkModeSelect />
             </FieldRow>
-            <FieldRow label="Scan Mode">
-              <ScanModeToggle />
-            </FieldRow>
-            <FieldRow
-              label="IP Version"
-              tooltip="Which address families to search for working routes. IPv4 is the safest default on most networks."
-            >
-              <IpVersionToggle />
-            </FieldRow>
-            <FieldRow
-              label="MASQUE Transport"
-              tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
-            >
-              <MasqueTransportToggle />
-            </FieldRow>
-            <FieldRow
-              label="Obfuscation"
-              tooltip="Disguises the handshake so DPI can't fingerprint the protocol. Heavier profiles send more decoy traffic — try escalating if the default doesn't connect. Options change based on the selected protocol."
-            >
-              <NoizeProfileToggle />
-            </FieldRow>
+            {tunnelOptions && (
+              <>
+                <FieldRow
+                  label="Protocol"
+                  tooltip="MASQUE disguises traffic as normal HTTPS — best against strict censorship. WireGuard is lighter and faster. gool nests two WireGuard tunnels and MASQUE-in-MASQUE nests two MASQUE hops — both give a different exit address at a speed cost."
+                >
+                  <ProtocolSelect />
+                </FieldRow>
+                <FieldRow label="Scan Mode">
+                  <ScanModeToggle />
+                </FieldRow>
+                <FieldRow
+                  label="IP Version"
+                  tooltip="Which address families to search for working routes. IPv4 is the safest default on most networks."
+                >
+                  <IpVersionToggle />
+                </FieldRow>
+                <FieldRow
+                  label="MASQUE Transport"
+                  tooltip="How the MASQUE tunnel carries traffic. HTTP/3 (QUIC) has the fastest handshake; HTTP/2 (TCP) looks like ordinary HTTPS and works where UDP is blocked or throttled. Only applies to the MASQUE protocol."
+                >
+                  <MasqueTransportToggle />
+                </FieldRow>
+                <FieldRow
+                  label="Obfuscation"
+                  tooltip="Disguises the handshake so DPI can't fingerprint the protocol. Heavier profiles send more decoy traffic — try escalating if the default doesn't connect. Options change based on the selected protocol."
+                >
+                  <NoizeProfileToggle />
+                </FieldRow>
+              </>
+            )}
             <FieldRow
               label="SOCKS5 Proxy"
               tooltip="The local address Aether's SOCKS5 proxy listens on. Change the port to avoid conflicts, or enable LAN to share the tunnel with other devices on your network."
@@ -138,6 +156,29 @@ export function AdvancedPanel() {
             >
               <RoutingSettings />
             </FieldRow>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                Set as system proxy
+                <Tooltip>
+                  <TooltipTrigger aria-label="About Set as system proxy">
+                    <Info size={12} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    While connected, points the operating system&apos;s proxy setting at the
+                    tunnel (through a local HTTP proxy on 127.0.0.1:1822), so browsers and most apps
+                    use it without any setup. The previous setting is restored on disconnect or
+                    exit. Apps that ignore the system proxy still need the SOCKS5 address.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Switch
+                checked={systemProxy}
+                onCheckedChange={setSystemProxy}
+                disabled={locked}
+                aria-label="Set as system proxy"
+              />
+            </div>
 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -166,6 +207,31 @@ export function AdvancedPanel() {
               <span className="text-[10px] tracking-wide text-muted-foreground uppercase">
                 Logs
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  // Clipboard can be unavailable or denied; nothing to recover.
+                  void navigator.clipboard
+                    ?.writeText(logs.map((l) => l.line).join("\n"))
+                    .catch(() => {});
+                }}
+                disabled={logs.length === 0}
+                className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground uppercase outline-none hover:text-foreground focus-visible:text-foreground disabled:opacity-40"
+                title="Copy all logs to the clipboard"
+              >
+                <Copy size={12} />
+                Copy
+              </button>
+              <button
+                type="button"
+                onClick={clearLogs}
+                disabled={logs.length === 0}
+                className="flex items-center gap-1 text-[10px] tracking-wide text-muted-foreground uppercase outline-none hover:text-foreground focus-visible:text-foreground disabled:opacity-40"
+                title="Clear the log view"
+              >
+                <Trash2 size={12} />
+                Clear
+              </button>
               <div className="h-px flex-1 bg-border" />
             </div>
 

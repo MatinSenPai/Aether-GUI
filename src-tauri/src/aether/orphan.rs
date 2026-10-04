@@ -13,6 +13,29 @@ pub fn clear_pid(data_dir: &Path) {
     let _ = fs::remove_file(pid_file(data_dir));
 }
 
+/// Kills a process and all of its descendants. Aether launches Tor and
+/// Psiphon as children; a plain kill of the parent orphans them.
+pub fn kill_tree(pid: u32) {
+    kill_tree_impl(pid);
+}
+
+#[cfg(windows)]
+fn kill_tree_impl(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+        .status();
+}
+
+// The PTY makes Aether a session leader, so its pid is also its process group.
+#[cfg(unix)]
+fn kill_tree_impl(pid: u32) {
+    let _ = std::process::Command::new("kill")
+        .args(["-9", "--", &format!("-{pid}")])
+        .status();
+}
+
 /// On startup, if a pid file survives from a prior crash and that process is
 /// still alive, kill it before the user can click Connect — otherwise a
 /// leftover Aether would just fail to bind the SOCKS port for the new one.
@@ -25,7 +48,7 @@ pub fn reap_orphan(data_dir: &Path) {
     };
     if let Ok(pid) = contents.trim().parse::<u32>() {
         if is_alive(pid) {
-            kill_pid(pid);
+            kill_tree(pid);
         }
     }
     let _ = fs::remove_file(&path);
@@ -40,25 +63,13 @@ fn is_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(unix)]
-fn kill_pid(pid: u32) {
-    let _ = std::process::Command::new("kill")
-        .args(["-9", &pid.to_string()])
-        .status();
-}
-
 #[cfg(windows)]
 fn is_alive(pid: u32) -> bool {
+    use std::os::windows::process::CommandExt;
     std::process::Command::new("tasklist")
         .args(["/FI", &format!("PID eq {pid}")])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
         .unwrap_or(false)
-}
-
-#[cfg(windows)]
-fn kill_pid(pid: u32) {
-    let _ = std::process::Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/F"])
-        .status();
 }

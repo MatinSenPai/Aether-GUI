@@ -85,6 +85,11 @@ jobs:
             echo "::error::$bin is missing — the fetch step did not produce a core, so this bundle would ship with no tunnel engine."
             exit 1
           fi
+          # Tor/Psiphon modes need the helpers the core launches from pt/.
+          if [ ! -d src-tauri/binaries/pt ] || [ -z "$(ls -A src-tauri/binaries/pt)" ]; then
+            echo "::error::src-tauri/binaries/pt is missing or empty — Tor and Psiphon would not start in this bundle."
+            exit 1
+          fi
           ls -l "$bin"
 
       - run: npm ci

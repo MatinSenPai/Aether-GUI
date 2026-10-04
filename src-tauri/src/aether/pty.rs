@@ -14,6 +14,14 @@ pub struct PtySession {
     child: Box<dyn Child + Send + Sync>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     prompts_done: Arc<AtomicBool>,
+    /// Set once Tor/Psiphon logs that it is carrying traffic. Their proxy
+    /// port opens long before that (Tor listens while still bootstrapping),
+    /// so the port alone cannot mean "connected" for those modes.
+    overlay_ready: Arc<AtomicBool>,
+    /// Set when the core prints its startup banner. Flags suppress every
+    /// prompt, so `prompts_done` alone would leave the UI on "Launching"
+    /// for the whole scan.
+    engine_started: Arc<AtomicBool>,
     // Keeps the pty master (and thus the slave/child's controlling tty) alive
     // for the life of the session; never read from directly after spawn.
     _master: Box<dyn MasterPty + Send>,
@@ -26,6 +34,14 @@ impl PtySession {
 
     pub fn prompts_done(&self) -> bool {
         self.prompts_done.load(Ordering::Relaxed)
+    }
+
+    pub fn engine_started(&self) -> bool {
+        self.engine_started.load(Ordering::Relaxed)
+    }
+
+    pub fn overlay_ready(&self) -> bool {
+        self.overlay_ready.load(Ordering::Relaxed)
     }
 
     pub fn try_wait(&mut self) -> Option<portable_pty::ExitStatus> {
@@ -62,7 +78,13 @@ impl PtySession {
             .map_err(|e| AetherError::Internal(format!("sending Zero Trust access code: {e}")))
     }
 
+    /// Kills Aether and everything it launched. Tor and Psiphon run as child
+    /// processes of the core, so killing only the core would leave them
+    /// running and holding their ports.
     pub fn kill(&mut self) {
+        if let Some(pid) = self.child.process_id() {
+            super::orphan::kill_tree(pid);
+        }
         let _ = self.child.kill();
     }
 }
@@ -104,9 +126,14 @@ pub fn spawn(
     // Env var, not a flag (see ConnectionProfile::masque_http2's doc-comment):
     // any value suppresses Aether 1.2.0's interactive "MASQUE transport"
     // prompt, and only a truthy one selects HTTP/2.
+    // Reverse Tor/Psiphon carries TCP only, so it always runs MASQUE over HTTP/2.
     cmd.env(
         "AETHER_MASQUE_HTTP2",
-        if profile.masque_http2 { "1" } else { "0" },
+        if profile.masque_http2 || profile.network_mode.is_reverse() {
+            "1"
+        } else {
+            "0"
+        },
     );
     // Keep Access credentials out of the process command line. Aether's
     // flags and environment variables are equivalent, but command arguments
@@ -154,6 +181,10 @@ pub fn spawn(
 
     let prompts_done = Arc::new(AtomicBool::new(false));
     let prompts_done_for_thread = Arc::clone(&prompts_done);
+    let overlay_ready = Arc::new(AtomicBool::new(false));
+    let overlay_ready_for_thread = Arc::clone(&overlay_ready);
+    let engine_started = Arc::new(AtomicBool::new(false));
+    let engine_started_for_thread = Arc::clone(&engine_started);
 
     std::thread::spawn(move || {
         read_loop(
@@ -162,6 +193,8 @@ pub fn spawn(
             profile,
             log_tx,
             prompts_done_for_thread,
+            overlay_ready_for_thread,
+            engine_started_for_thread,
         );
     });
 
@@ -169,6 +202,8 @@ pub fn spawn(
         child,
         writer,
         prompts_done,
+        overlay_ready,
+        engine_started,
         _master: pair.master,
     })
 }
@@ -179,6 +214,8 @@ fn read_loop(
     profile: ConnectionProfile,
     log_tx: Sender<LogEvent>,
     prompts_done: Arc<AtomicBool>,
+    overlay_ready: Arc<AtomicBool>,
+    engine_started: Arc<AtomicBool>,
 ) {
     let mut answered: HashSet<&'static str> = HashSet::new();
     let mut current_section: Option<&'static str> = None;
@@ -210,6 +247,12 @@ fn read_loop(
                     // prompts.rs) — allow re-answering, or it blocks forever.
                     answered.remove(rule.id);
                 }
+            }
+            if line.contains("Aether v") {
+                engine_started.store(true, Ordering::Relaxed);
+            }
+            if is_overlay_ready_line(&line) {
+                overlay_ready.store(true, Ordering::Relaxed);
             }
             let _ = log_tx.send(LogEvent {
                 line,
@@ -261,6 +304,12 @@ fn read_loop(
             }
         }
     }
+}
+
+/// The core's own "carrying traffic" line for Tor and Psiphon, in every
+/// mode: `[+] tor is ready; …` / `[+] psiphon is ready; …`.
+fn is_overlay_ready_line(line: &str) -> bool {
+    line.contains("tor is ready;") || line.contains("psiphon is ready;")
 }
 
 /// Longest the unterminated tail may grow before the front is discarded.
@@ -316,14 +365,35 @@ fn strip_ansi(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut chars = s.chars().peekable();
     while let Some(c) = chars.next() {
-        if c == '\u{1b}' && chars.peek() == Some(&'[') {
-            chars.next();
-            for c2 in chars.by_ref() {
-                if c2.is_ascii_alphabetic() {
-                    break;
+        if c == '\u{1b}' {
+            match chars.peek() {
+                Some('[') => {
+                    chars.next();
+                    for c2 in chars.by_ref() {
+                        if c2.is_ascii_alphabetic() {
+                            break;
+                        }
+                    }
+                    continue;
                 }
+                // OSC (`ESC ] ... BEL` or `... ESC \`): ConPTY turns console
+                // title changes into these. Left in, they glue onto the
+                // "Protocol:" header and the prompt is never answered.
+                Some(']') => {
+                    chars.next();
+                    while let Some(c2) = chars.next() {
+                        if c2 == '\x07' {
+                            break;
+                        }
+                        if c2 == '\u{1b}' && chars.peek() == Some(&'\\') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                _ => {}
             }
-            continue;
         }
         out.push(c);
     }
@@ -337,6 +407,27 @@ mod tests {
     fn feed(buf: &mut String, chunk: &str) -> Vec<String> {
         buf.push_str(chunk);
         drain_lines(buf)
+    }
+
+    #[test]
+    fn strips_csi_and_osc_sequences() {
+        assert_eq!(strip_ansi("\x1b[32mINFO\x1b[0m ok"), "INFO ok");
+        // OSC terminated by BEL and by ESC \, as ConPTY emits for titles.
+        assert_eq!(strip_ansi("\x1b]0;Aether\x07Protocol:"), "Protocol:");
+        assert_eq!(strip_ansi("\x1b]0;Aether\x1b\\Scan mode:"), "Scan mode:");
+    }
+
+    #[test]
+    fn recognises_the_core_ready_lines() {
+        assert!(is_overlay_ready_line(
+            "[2026-10-04T09:00:00Z INFO  aether::tor::with_tor] [+] tor is ready; 127.0.0.1:1819 leaves through tor"
+        ));
+        assert!(is_overlay_ready_line(
+            "[+] psiphon is ready; the tunnel goes out through 127.0.0.1:50000"
+        ));
+        assert!(!is_overlay_ready_line(
+            "[*] tor reaching the network: 8%: handshaking with Tor relays"
+        ));
     }
 
     #[test]

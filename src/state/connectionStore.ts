@@ -6,6 +6,7 @@ import type {
   ConnectionStatus,
   LogLine,
   MasqueNoize,
+  NetworkMode,
   WgNoize,
   ZeroTrustAuth,
 } from "@/types/connection";
@@ -48,6 +49,10 @@ interface ConnectionState {
   setHttpProxy: (http_proxy: string) => void;
   setUpstream: (upstream: string) => void;
   setExitLoc: (exit_loc: string) => void;
+  setNetworkMode: (network_mode: NetworkMode) => void;
+  setPsiphonRegion: (psiphon_region: string) => void;
+  setSystemProxy: (system_proxy: boolean) => void;
+  clearLogs: () => void;
   retryAfterSidecarError: () => void;
 }
 
@@ -76,6 +81,9 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     http_proxy: "",
     upstream: "",
     exit_loc: "",
+    network_mode: "warp",
+    psiphon_region: "",
+    system_proxy: false,
   },
   logs: [],
   sidecarError: null,
@@ -184,6 +192,17 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   setExitLoc: (exit_loc) =>
     set((s) => ({ profile: { ...s.profile, exit_loc } })),
+
+  setNetworkMode: (network_mode) =>
+    set((s) => ({ profile: { ...s.profile, network_mode } })),
+
+  setPsiphonRegion: (psiphon_region) =>
+    set((s) => ({ profile: { ...s.profile, psiphon_region } })),
+
+  setSystemProxy: (system_proxy) =>
+    set((s) => ({ profile: { ...s.profile, system_proxy } })),
+
+  clearLogs: () => set({ logs: [] }),
 
   // Clears the fallback screen so the user can attempt Connect again (e.g.
   // after fixing a broken install) — the next connect() call will re-set

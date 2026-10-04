@@ -4,6 +4,7 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { ConnectionStatusLine } from "@/components/ConnectionStatusLine";
 import { AdvancedPanel } from "@/components/AdvancedPanel";
 import { CloseToTrayToggle } from "@/components/CloseToTrayToggle";
+import { BackendToggle } from "@/components/BackendToggle";
 import { AmbientBackground } from "@/components/AmbientBackground";
 import { SidecarErrorScreen } from "@/components/SidecarErrorScreen";
 import { AccessCodePrompt } from "@/components/AccessCodePrompt";
@@ -29,6 +30,16 @@ function MainScreen() {
       </div>
       <AdvancedPanel />
       <CloseToTrayToggle />
+      <BackendToggle
+        label="Start on login"
+        getCommand="get_autostart"
+        setCommand="set_autostart"
+      />
+      <BackendToggle
+        label="Connect on launch"
+        getCommand="get_auto_connect"
+        setCommand="set_auto_connect"
+      />
     </div>
   );
 }

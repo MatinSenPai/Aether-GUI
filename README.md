@@ -26,10 +26,14 @@ This project does not reimplement any of Aether's tunneling logic. It drives the
   - **IP Version**: IPv4, IPv6, or both
   - **MASQUE Transport**: HTTP/3 (QUIC — fastest handshake) or HTTP/2 (TCP — looks like ordinary HTTPS, works where UDP is blocked or throttled)
   - **Obfuscation**: how heavily the handshake is disguised from DPI — profiles adapt to the selected protocol; escalate if the default can't get through
+  - **Network**: carry **Psiphon** or **Tor** — alone, inside the WARP tunnel, or with WARP dialled through them. Psiphon works out of the box and connects in seconds, which makes it a good first thing to try on a heavily filtered network
+  - **Set as system proxy**: while connected, points the OS proxy setting at the tunnel (through a local HTTP proxy) so browsers and most apps use it with no setup; the previous setting is restored on disconnect, on exit, and even after a crash
   - **HTTP Proxy, Upstream & Exit**: an extra HTTP CONNECT proxy for apps without SOCKS5, chaining through another proxy already running on your machine, and an exit-country filter that refuses tunnels leaving from unwanted countries
   - **Quick reconnect**: remember the last working gateway and re-test it first, skipping the full scan when it still works
   
   Each option has an explanation on hover.
+- **Runs in the background** — optional *Start on login* (launches minimized to the tray) and *Connect on launch*. The tray icon gets a green dot while connected and an amber one while connecting, and its menu has Connect / Disconnect.
+- **Logs you can use** — copy the log to the clipboard or clear it from the Advanced panel.
 - **Live progress** — while Aether searches for a working route, the GUI shows real elapsed time and, once Aether reports its own scan budget, an actual percentage and progress bar — not just a spinner.
 - **Automatic reconnect** — if the tunnel drops unexpectedly mid-session (observed occasionally with WARP-in-WARP, but handled the same way for every protocol), the GUI retries automatically with backoff, shown as a visible "Reconnecting… (attempt N of 3)" rather than silently dying or dumping you back to a bare error. A user-requested disconnect is never retried.
 
@@ -92,7 +96,7 @@ Windows x64 only for now — see [Building from source](#building-from-source) f
 ## How it works
 
 - **Frontend**: React 19 + Tailwind v4, state managed with Zustand, animated with [Motion](https://motion.dev/) — all talking to the Rust backend over Tauri's IPC. Deliberately lightweight: the ambient background is two compositor-only CSS gradient orbs, and every looping animation freezes while the window is unfocused, so the app costs next to nothing sitting in the background.
-- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real [Aether v2.1.0](https://github.com/CluvexStudio/Aether/releases/tag/v2.1.0) binary in a genuine pseudo-terminal. Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), obfuscation profile, quick reconnect, Zero Trust, tunnel DNS, routing rules, HTTP proxy, upstream proxy and exit-country filter — is passed up front as CLI flags/environment, so Aether's interactive prompts normally never appear. A Zero Trust email-code prompt is bridged safely into the GUI; credentials are never written to the saved profile.
+- **Backend**: Rust, using [`portable-pty`](https://docs.rs/portable-pty) to spawn the real [Aether v2.1.0](https://github.com/CluvexStudio/Aether/releases/tag/v2.1.0) binary in a genuine pseudo-terminal (the Tor and Psiphon helpers ship in `pt/` beside it, and are stopped together with it). Your chosen profile — protocol, scan mode, IP version, MASQUE transport (HTTP/3 or HTTP/2), obfuscation profile, quick reconnect, Zero Trust, tunnel DNS, routing rules, HTTP proxy, upstream proxy and exit-country filter — is passed up front as CLI flags/environment, so Aether's interactive prompts normally never appear. A Zero Trust email-code prompt is bridged safely into the GUI; credentials are never written to the saved profile.
 - **Ground truth for "connected"**: the GUI doesn't trust Aether's log wording alone (that's fragile across releases) — it treats a successful TCP connection to the local SOCKS5 port (`127.0.0.1:1819`) as the actual proof the tunnel is up.
 - **State machine**: `Idle → Launching → Connecting → Connected`, with `Reconnecting` and `Error` as the two ways a connection attempt can end up needing your attention — `Reconnecting` retries automatically (with backoff, capped at 3 attempts), `Error` is the final word once retries are exhausted or something isn't retriable (e.g. the binary itself is missing).
 

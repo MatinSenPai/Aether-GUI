@@ -3,6 +3,7 @@ pub mod profiles;
 pub mod prompts;
 pub mod pty;
 pub mod status;
+pub mod sysproxy;
 
 use crate::error::AetherError;
 use crate::events::{now_millis, LogEvent, LOG_EVENT, STATUS_EVENT};
@@ -102,12 +103,34 @@ fn resolve_binary(app: &AppHandle) -> Result<PathBuf, AetherError> {
     };
     // Bundlers don't reliably preserve the exec bit on resource files, and a
     // non-executable core binary would fail every spawn with a cryptic error.
+    // Same for the Tor/Psiphon helpers the core launches from `pt/` beside it.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755));
+        let helpers = path
+            .parent()
+            .and_then(|d| std::fs::read_dir(d.join("pt")).ok())
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path());
+        for p in std::iter::once(path.clone()).chain(helpers) {
+            let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755));
+        }
     }
     Ok(path)
+}
+
+/// Emits a state change and runs its side effects: the tray icon follows the
+/// state, and the OS proxy setting is released the moment the tunnel is no
+/// longer `Connected` (it is applied in `monitor_connect`, which knows the
+/// profile).
+fn publish(app: &AppHandle, state: &ConnectionState) {
+    let _ = app.emit(STATUS_EVENT, state);
+    crate::tray::update_state(app, state);
+    if !matches!(state, ConnectionState::Connected { .. }) {
+        sysproxy::restore(app);
+    }
 }
 
 fn set_state_and_emit(
@@ -116,7 +139,7 @@ fn set_state_and_emit(
     new_state: ConnectionState,
 ) {
     manager.lock().unwrap().state = new_state.clone();
-    let _ = app.emit(STATUS_EVENT, &new_state);
+    publish(app, &new_state);
 }
 
 /// Kicks off a connection attempt and returns as soon as Aether is spawned
@@ -152,16 +175,19 @@ pub fn start_connect(
         // checked under the same lock as the state check above so a rapid
         // double-click can't race two connect() calls past this guard before
         // the first transitions to Launching.
-        let socks = status::parse_bind_address(&profile.bind_address);
-        if status::port_is_live(&socks) {
-            return Err(AetherError::PortInUse(socks.port()));
+        if let Some(busy) = profile
+            .listen_addrs()
+            .iter()
+            .find(|a| status::port_is_live(a))
+        {
+            return Err(AetherError::PortInUse(busy.port()));
         }
         mgr.state = ConnectionState::Launching;
         // A fresh user-initiated connect always gets a full retry budget,
         // independent of whatever happened on a previous, unrelated attempt.
         mgr.retry_count = 0;
     }
-    let _ = app.emit(STATUS_EVENT, &ConnectionState::Launching);
+    publish(&app, &ConnectionState::Launching);
 
     spawn_and_monitor(app, manager, binary, data_dir, profile)
 }
@@ -304,8 +330,8 @@ fn monitor_connect(
     data_dir: PathBuf,
     profile: ConnectionProfile,
 ) {
-    let deadline = Instant::now() + status::connect_timeout(&profile.scan_mode);
-    let socks = status::parse_bind_address(&profile.bind_address);
+    let deadline = Instant::now() + status::profile_connect_timeout(&profile);
+    let ready = profile.ready_addrs();
     let mut announced_connecting = false;
 
     loop {
@@ -334,21 +360,25 @@ fn monitor_connect(
             let done = mgr
                 .session
                 .as_ref()
-                .map(|s| s.prompts_done())
+                .map(|s| s.prompts_done() || s.engine_started())
                 .unwrap_or(false);
             if done {
                 mgr.state = ConnectionState::Connecting;
                 let new_state = mgr.state.clone();
                 drop(mgr);
-                let _ = app.emit(STATUS_EVENT, &new_state);
+                publish(&app, &new_state);
                 announced_connecting = true;
                 continue;
             }
         }
 
-        if status::port_is_live(&socks) {
+        // Tor/Psiphon open their port before they can carry anything, so
+        // those modes also wait for the core to say it is ready.
+        let overlay_ok = profile.network_mode == profiles::NetworkMode::Warp
+            || mgr.session.as_ref().is_some_and(|s| s.overlay_ready());
+        if overlay_ok && ready.iter().all(status::port_is_live) {
             let new_state = ConnectionState::Connected {
-                socks_addr: profile.bind_address.clone(),
+                socks_addr: profile.primary_addr(),
                 connected_at_ms: now_millis(),
             };
             mgr.state = new_state.clone();
@@ -356,7 +386,20 @@ fn monitor_connect(
             // rather than inheriting whatever it took to get here.
             mgr.retry_count = 0;
             drop(mgr);
-            let _ = app.emit(STATUS_EVENT, &new_state);
+            publish(&app, &new_state);
+            if profile.system_proxy {
+                if let Some(addr) = profile.http_front() {
+                    if let Err(e) = sysproxy::apply(&app, &addr) {
+                        let _ = app.emit(
+                            LOG_EVENT,
+                            &LogEvent {
+                                line: format!("[gui] could not set the system proxy: {e}"),
+                                timestamp: now_millis(),
+                            },
+                        );
+                    }
+                }
+            }
             // Only persisted as "last successful" once actually proven to
             // work, never on a mere attempt (see profiles::save's doc-comment).
             profiles::save(&app, &profile);

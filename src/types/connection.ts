@@ -12,6 +12,14 @@ export type ConnectionStatus =
 
 export type Protocol = "auto" | "masque" | "wireguard" | "gool" | "mim";
 export type ScanMode = "turbo" | "balanced" | "thorough" | "verified" | "ironclad";
+export type NetworkMode =
+  | "warp"
+  | "psiphon_only"
+  | "tor_only"
+  | "psiphon_chain"
+  | "tor_chain"
+  | "psiphon_reverse"
+  | "tor_reverse";
 export type IpVersion = "v4" | "v6" | "both";
 export type MasqueNoize = "firewall" | "gfw" | "off";
 export type WgNoize = "balanced" | "aggressive" | "light" | "off";
@@ -55,6 +63,13 @@ export interface ConnectionProfile {
   upstream: string;
   /** Aether ≥2.1.0: exit-country filter, e.g. "!IR,RU" or "DE,SE". */
   exit_loc: string;
+  /** Aether ≥2.0.0: carry Tor or Psiphon (alone, inside the tunnel, or
+   * dialling the tunnel through it). */
+  network_mode: NetworkMode;
+  /** Aether ≥2.1.0: country code Psiphon should exit from, e.g. "DE". */
+  psiphon_region: string;
+  /** Point the OS proxy setting at the tunnel while connected. */
+  system_proxy: boolean;
 }
 
 export interface LogLine {

@@ -65,6 +65,7 @@ function ScanProgressBar({ percent }: { percent: number | null }) {
  */
 export function ConnectionStatusLine() {
   const status = useConnectionStore((s) => s.status);
+  const networkMode = useConnectionStore((s) => s.profile.network_mode);
   const scanBudgetSecs = useConnectionStore((s) => s.scanBudgetSecs);
   const connectedAt = status.state === "Connected" ? status.connected_at_ms : null;
   const elapsed = useElapsed(connectedAt).formatted;
@@ -106,10 +107,14 @@ export function ConnectionStatusLine() {
       break;
     case "Launching":
       primary = "Starting Aether…";
-      secondary = "Answering setup prompts";
+      secondary = "Launching the tunnel engine";
       break;
     case "Connecting":
-      primary = "Finding a route…";
+      primary = networkMode.startsWith("tor")
+        ? "Reaching the Tor network…"
+        : networkMode.startsWith("psiphon")
+          ? "Reaching Psiphon…"
+          : "Finding a route…";
       secondary =
         scanPercent != null
           ? `Still searching · ${attemptElapsed} · ${scanPercent}%`
@@ -121,7 +126,7 @@ export function ConnectionStatusLine() {
       break;
     case "Connected":
       primary = "Connected";
-      secondary = elapsed;
+      secondary = `${elapsed} · ${status.socks_addr}`;
       break;
     case "Disconnecting":
       primary = "Disconnecting…";

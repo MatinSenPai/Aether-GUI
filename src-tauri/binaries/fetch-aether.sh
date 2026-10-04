@@ -92,4 +92,13 @@ fi
 
 chmod +x "$EXTRACTED"
 mv -f "$EXTRACTED" "$DEST_DIR/aether"
+
+# Tor and Psiphon helpers (lyrebird, psiphon-tunnel-core) ship in pt/ beside
+# the binary; the core looks for them there, so they travel with it.
+PT="$(dirname "$EXTRACTED")/pt"
+if [ -d "$PT" ]; then
+  rm -rf "$DEST_DIR/pt"
+  mv "$PT" "$DEST_DIR/pt"
+  chmod +x "$DEST_DIR"/pt/* 2>/dev/null || true
+fi
 echo "Aether binary ready at $DEST_DIR/aether"

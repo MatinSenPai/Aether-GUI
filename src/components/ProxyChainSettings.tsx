@@ -20,7 +20,7 @@ export function ProxyChainSettings() {
         value={profile.http_proxy}
         disabled={locked}
         onChange={(e) => setHttpProxy(e.target.value)}
-        placeholder="HTTP proxy address, e.g. 127.0.0.1:1820 (optional)"
+        placeholder="HTTP proxy address, e.g. 127.0.0.1:1822 (optional)"
         className={INPUT}
         aria-label="HTTP CONNECT proxy address"
       />

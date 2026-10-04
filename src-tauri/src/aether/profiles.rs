@@ -111,6 +111,89 @@ impl WgNoize {
     }
 }
 
+/// Aether >=2.0.0 (Tor) / >=2.1.0 (Psiphon): optionally carry Tor or Psiphon.
+/// `*Only` runs it with no WARP tunnel (the SOCKS5 proxy on `--bind` is plain
+/// Tor/Psiphon); `*Chain` carries it inside the tunnel (a second proxy comes
+/// out of Tor/Psiphon); `*Reverse` dials the tunnel through it, so WARP is
+/// reached from a Tor/Psiphon exit.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkMode {
+    #[default]
+    Warp,
+    PsiphonOnly,
+    TorOnly,
+    PsiphonChain,
+    TorChain,
+    PsiphonReverse,
+    TorReverse,
+}
+
+pub const TOR_BIND: &str = "127.0.0.1:1820";
+pub const PSIPHON_BIND: &str = "127.0.0.1:1821";
+/// Local HTTP proxy used for the system proxy when the user hasn't set one.
+pub const SYSTEM_PROXY_BIND: &str = "127.0.0.1:1822";
+
+impl NetworkMode {
+    pub fn flag(&self) -> Option<&'static str> {
+        match self {
+            NetworkMode::Warp => None,
+            NetworkMode::PsiphonOnly => Some("--psiphon-only"),
+            NetworkMode::TorOnly => Some("--tor-only"),
+            NetworkMode::PsiphonChain => Some("--psiphon"),
+            NetworkMode::TorChain => Some("--tor"),
+            NetworkMode::PsiphonReverse => Some("--psiphon-reverse"),
+            NetworkMode::TorReverse => Some("--tor-reverse"),
+        }
+    }
+
+    pub fn is_psiphon(&self) -> bool {
+        matches!(
+            self,
+            NetworkMode::PsiphonOnly | NetworkMode::PsiphonChain | NetworkMode::PsiphonReverse
+        )
+    }
+
+    pub fn is_tor(&self) -> bool {
+        matches!(
+            self,
+            NetworkMode::TorOnly | NetworkMode::TorChain | NetworkMode::TorReverse
+        )
+    }
+
+    /// No WARP tunnel underneath: protocol, scan mode and noize don't apply.
+    pub fn is_only(&self) -> bool {
+        matches!(self, NetworkMode::PsiphonOnly | NetworkMode::TorOnly)
+    }
+
+    /// Reverse modes refuse WireGuard/gool and always run MASQUE over HTTP/2.
+    pub fn is_reverse(&self) -> bool {
+        matches!(self, NetworkMode::PsiphonReverse | NetworkMode::TorReverse)
+    }
+
+    /// The extra proxy Tor/Psiphon opens next to `--bind` (chain/reverse).
+    fn extra_bind(&self) -> Option<&'static str> {
+        match self {
+            NetworkMode::TorChain | NetworkMode::TorReverse => Some(TOR_BIND),
+            NetworkMode::PsiphonChain | NetworkMode::PsiphonReverse => Some(PSIPHON_BIND),
+            _ => None,
+        }
+    }
+
+    /// Extra seconds the GUI should wait on top of the scan budget: Tor may
+    /// try plainly (75s) and then walk through bridges (up to 360s each);
+    /// Psiphon waits up to 180s to tunnel.
+    pub fn extra_wait_secs(&self) -> u64 {
+        if self.is_tor() {
+            480
+        } else if self.is_psiphon() {
+            200
+        } else {
+            0
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ConnectionProfile {
     pub protocol: Protocol,
@@ -188,6 +271,17 @@ pub struct ConnectionProfile {
     /// Aether ≥2.1.0: exit-country filter, e.g. `!IR,RU` or `DE,SE`.
     #[serde(default)]
     pub exit_loc: String,
+    /// Aether >=2.0.0: carry Tor/Psiphon (see [`NetworkMode`]).
+    #[serde(default)]
+    pub network_mode: NetworkMode,
+    /// Aether >=2.1.0: ask Psiphon to leave from this country, e.g. `DE`.
+    #[serde(default)]
+    pub psiphon_region: String,
+    /// Point the OS-wide proxy setting at the tunnel while connected. This
+    /// uses Aether's HTTP CONNECT listener, which every OS proxy setting
+    /// understands (SOCKS support in system settings is patchy).
+    #[serde(default)]
+    pub system_proxy: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
@@ -197,6 +291,11 @@ pub enum ZeroTrustAuth {
     Email,
     Service,
     Token,
+}
+
+fn is_country_code(s: &str) -> bool {
+    let s = s.trim();
+    s.len() == 2 && s.chars().all(|c| c.is_ascii_alphabetic())
 }
 
 fn default_true() -> bool {
@@ -224,12 +323,27 @@ impl ConnectionProfile {
     /// leave unanswered.
     pub fn as_args(&self) -> Vec<String> {
         let mut args = Vec::with_capacity(20);
-        match self.protocol {
+        // Reverse modes carry only TCP, so the core refuses WireGuard/gool.
+        let protocol = if self.network_mode.is_reverse()
+            && matches!(self.protocol, Protocol::Wireguard | Protocol::Gool)
+        {
+            &Protocol::Masque
+        } else {
+            &self.protocol
+        };
+        match protocol {
             Protocol::Auto => {}
             Protocol::Masque => args.push("--masque".into()),
             Protocol::Wireguard => args.push("--wg".into()),
             Protocol::Gool => args.push("--gool".into()),
             Protocol::Mim => args.push("--mim".into()),
+        }
+        if let Some(flag) = self.network_mode.flag() {
+            args.push(flag.into());
+            if self.network_mode.is_psiphon() && is_country_code(&self.psiphon_region) {
+                args.push("--psiphon-region".into());
+                args.push(self.psiphon_region.trim().to_ascii_uppercase());
+            }
         }
         args.push(match self.scan_mode {
             ScanMode::Turbo => "--turbo".into(),
@@ -251,7 +365,7 @@ impl ConnectionProfile {
         // Noize profile — pick the value matching the active protocol family.
         args.push("--noize".into());
         args.push(
-            match self.protocol {
+            match protocol {
                 Protocol::Auto | Protocol::Masque | Protocol::Mim => self.masque_noize.as_flag(),
                 Protocol::Wireguard | Protocol::Gool => self.wg_noize.as_flag(),
             }
@@ -275,14 +389,9 @@ impl ConnectionProfile {
                 args.push("--gateway".into());
             }
         }
-        if self
-            .http_proxy
-            .trim()
-            .parse::<std::net::SocketAddr>()
-            .is_ok()
-        {
-            args.push("--http-proxy".into());
-            args.push(self.http_proxy.trim().into());
+        if let Some(addr) = self.http_front() {
+            args.push(self.http_front_flag().into());
+            args.push(addr.to_string());
         }
         if !self.upstream.trim().is_empty() {
             args.push("--upstream".into());
@@ -305,6 +414,58 @@ impl ConnectionProfile {
             args.push(self.routes_file.trim().into());
         }
         args
+    }
+
+    /// The HTTP CONNECT address to serve next to the primary SOCKS5 proxy:
+    /// the user's own, or a default when the system proxy needs one.
+    pub fn http_front(&self) -> Option<std::net::SocketAddr> {
+        self.http_proxy.trim().parse().ok().or_else(|| {
+            self.system_proxy
+                .then(|| SYSTEM_PROXY_BIND.parse().unwrap())
+        })
+    }
+
+    /// Each Tor/Psiphon chain has its own HTTP flag; plain and reverse modes
+    /// serve HTTP from the WARP proxy.
+    fn http_front_flag(&self) -> &'static str {
+        match self.network_mode {
+            NetworkMode::PsiphonOnly | NetworkMode::PsiphonChain => "--psiphon-http",
+            NetworkMode::TorOnly | NetworkMode::TorChain => "--tor-http",
+            _ => "--http-proxy",
+        }
+    }
+
+    /// Ports that must answer before the GUI reports connected. The HTTP
+    /// front is not among them: it is a convenience, never a reason to wait.
+    pub fn ready_addrs(&self) -> Vec<std::net::SocketAddr> {
+        let mut out = vec![crate::aether::status::parse_bind_address(
+            &self.bind_address,
+        )];
+        out.extend(
+            self.network_mode
+                .extra_bind()
+                .and_then(|a| a.parse::<std::net::SocketAddr>().ok()),
+        );
+        out
+    }
+
+    /// The SOCKS5 address a user should point apps at. In a chain that is the
+    /// Tor/Psiphon proxy (`--bind` keeps the plain WARP exit); otherwise it
+    /// is `--bind`.
+    pub fn primary_addr(&self) -> String {
+        match self.network_mode {
+            NetworkMode::TorChain => TOR_BIND.into(),
+            NetworkMode::PsiphonChain => PSIPHON_BIND.into(),
+            _ => self.bind_address.clone(),
+        }
+    }
+
+    /// Every local port Aether must have open before the GUI calls it
+    /// connected, and must be free before launching.
+    pub fn listen_addrs(&self) -> Vec<std::net::SocketAddr> {
+        let mut out = self.ready_addrs();
+        out.extend(self.http_front());
+        out
     }
 
     /// The core accepts Zero Trust credentials as flags too, but putting a
@@ -362,6 +523,9 @@ impl Default for ConnectionProfile {
             http_proxy: String::new(),
             upstream: String::new(),
             exit_loc: String::new(),
+            network_mode: NetworkMode::Warp,
+            psiphon_region: String::new(),
+            system_proxy: false,
         }
     }
 }
@@ -574,5 +738,110 @@ mod tests {
             Some(("AETHER_ACCESS_EMAIL", "me@example.com"))
         );
         assert!(!p.as_args().iter().any(|arg| arg.contains("me@example.com")));
+    }
+
+    fn mode(network_mode: NetworkMode) -> ConnectionProfile {
+        ConnectionProfile {
+            network_mode,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn network_modes_emit_their_flag() {
+        for (m, flag) in [
+            (NetworkMode::PsiphonOnly, "--psiphon-only"),
+            (NetworkMode::TorOnly, "--tor-only"),
+            (NetworkMode::PsiphonChain, "--psiphon"),
+            (NetworkMode::TorChain, "--tor"),
+            (NetworkMode::PsiphonReverse, "--psiphon-reverse"),
+            (NetworkMode::TorReverse, "--tor-reverse"),
+        ] {
+            assert!(mode(m).as_args().iter().any(|a| a == flag), "{flag}");
+        }
+        assert!(!mode(NetworkMode::Warp)
+            .as_args()
+            .iter()
+            .any(|a| a.contains("tor")));
+    }
+
+    #[test]
+    fn reverse_mode_never_sends_wireguard_or_gool() {
+        let p = ConnectionProfile {
+            protocol: Protocol::Gool,
+            network_mode: NetworkMode::TorReverse,
+            ..Default::default()
+        };
+        let args = p.as_args();
+        assert!(args.contains(&"--masque".to_string()));
+        assert!(!args.contains(&"--gool".to_string()));
+    }
+
+    #[test]
+    fn psiphon_region_only_with_psiphon_and_valid_code() {
+        let with = |mode, region: &str| ConnectionProfile {
+            network_mode: mode,
+            psiphon_region: region.into(),
+            ..Default::default()
+        };
+        let args = with(NetworkMode::PsiphonOnly, " de ").as_args();
+        let i = args.iter().position(|a| a == "--psiphon-region").unwrap();
+        assert_eq!(args[i + 1], "DE");
+        assert!(!with(NetworkMode::PsiphonOnly, "germany")
+            .as_args()
+            .contains(&"--psiphon-region".into()));
+        assert!(!with(NetworkMode::TorOnly, "DE")
+            .as_args()
+            .contains(&"--psiphon-region".into()));
+    }
+
+    #[test]
+    fn system_proxy_asks_the_core_for_an_http_front() {
+        let p = ConnectionProfile {
+            system_proxy: true,
+            ..Default::default()
+        };
+        let args = p.as_args();
+        let i = args.iter().position(|a| a == "--http-proxy").unwrap();
+        assert_eq!(args[i + 1], SYSTEM_PROXY_BIND);
+        // Psiphon chains have their own HTTP flag.
+        let p = ConnectionProfile {
+            system_proxy: true,
+            network_mode: NetworkMode::PsiphonOnly,
+            ..Default::default()
+        };
+        assert!(p.as_args().contains(&"--psiphon-http".to_string()));
+        // A user-chosen address wins over the default.
+        let p = ConnectionProfile {
+            system_proxy: true,
+            http_proxy: "127.0.0.1:2000".into(),
+            ..Default::default()
+        };
+        assert_eq!(p.http_front(), Some("127.0.0.1:2000".parse().unwrap()));
+    }
+
+    #[test]
+    fn chain_modes_wait_for_both_proxies_and_point_at_the_extra_one() {
+        let p = mode(NetworkMode::TorChain);
+        assert_eq!(p.ready_addrs().len(), 2);
+        assert_eq!(p.primary_addr(), TOR_BIND);
+        let p = mode(NetworkMode::PsiphonOnly);
+        assert_eq!(p.ready_addrs().len(), 1);
+        assert_eq!(p.primary_addr(), "127.0.0.1:1819");
+        // the HTTP front is checked for being free, but never waited on
+        let p = ConnectionProfile {
+            system_proxy: true,
+            ..Default::default()
+        };
+        assert_eq!(p.ready_addrs().len(), 1);
+        assert_eq!(p.listen_addrs().len(), 2);
+    }
+
+    #[test]
+    fn old_profile_json_defaults_to_plain_warp() {
+        let json = r#"{"protocol":"auto","scan_mode":"balanced","ip_version":"v4"}"#;
+        let p: ConnectionProfile = serde_json::from_str(json).unwrap();
+        assert_eq!(p.network_mode, NetworkMode::Warp);
+        assert!(!p.system_proxy);
     }
 }
